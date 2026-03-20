@@ -18,12 +18,13 @@ st.markdown("""
         position: fixed; left: 0; bottom: 0; width: 100%;
         background-color: #f1f1f1; color: #555;
         text-align: center; padding: 10px; font-size: 14px;
-        border-top: 1px solid #e0e0e0;
+        border-top: 1px solid #e0e0e0; z-index: 100;
     }
+    .stSelectbox [data-testid='stMarkdownContainer'] { font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. OFFICIAL NIGERIAN CURRICULUM DATA (2025/2026 REVISION) ---
+# --- 2. 2026 NIGERIAN CURRICULUM DATA ---
 LEVELS = {
     "Pre-Nursery/Nursery": [
         "Letter Work (Literacy)", "Number Work (Numeracy)", "Science Experience", 
@@ -44,7 +45,7 @@ LEVELS = {
         "English Studies", "Mathematics", "Intermediate Science", "Digital Technologies", 
         "Nigerian History", "Social & Citizenship Studies", "Physical & Health Ed.", 
         "Business Studies", "Cultural & Creative Arts", "Religious Studies",
-        "Trade Subject (Solar/Fashion/Livestock/Cosmetology/GSM Repairs)"
+        "Trade Subject"
     ],
     "Senior Secondary (SSS 1-3)": [
         "General Mathematics (Core)", "English Language (Core)", "Citizenship & Heritage Studies (Core)", 
@@ -59,13 +60,12 @@ try:
     api_key = st.secrets["GROQ_API_KEY"]
     client = Groq(api_key=api_key)
 except Exception:
-    st.error("🔑 API Key Missing! Please check Streamlit Secrets.")
+    st.error("🔑 API Key Missing! Check your Streamlit Secrets.")
     st.stop()
 
 def create_docx(text, title):
     doc = Document()
     doc.add_heading(f'VIKIDYL AI: {title}', 0)
-    # Clean LaTeX for standard Word reading
     clean_text = text.replace('$', '').replace('\\', '') 
     doc.add_paragraph(clean_text)
     buffer = BytesIO()
@@ -73,28 +73,45 @@ def create_docx(text, title):
     buffer.seek(0)
     return buffer
 
-# --- 4. INTERFACE ---
+# --- 4. THE INTERFACE ---
 st.title("🎓 VIKIDYL AI")
-st.caption("Aligned with the New 2025/2026 Nigerian Curriculum (NERDC)")
+st.caption("Customized for the New Nigerian Curriculum Standards")
 
 tabs = st.tabs(["📚 Lesson Notes", "📊 Exams & Tests"])
 
 with tabs[0]:
     st.subheader("Scripted 5-Step Lesson")
-    cat = st.selectbox("School Level", list(LEVELS.keys()))
+    
+    c_level, c_tone = st.columns(2)
+    with c_level:
+        cat = st.selectbox("School Level", list(LEVELS.keys()))
+    with c_tone:
+        # NEW: TONE SELECTOR
+        tone = st.selectbox("Teaching Tone", ["Playful & Story-based", "Inquiry-based (Active)", "Formal & Academic", "Exam-Focused"])
+    
     sub = st.selectbox("Subject", LEVELS[cat])
     
     col_t, col_g = st.columns(2)
-    topic = col_t.text_input("Topic")
-    grade = col_g.text_input("Class (e.g. Basic 4 or JSS 2)")
+    topic = col_t.text_input("Topic", placeholder="e.g. My Body Parts")
+    grade = col_g.text_input("Class", placeholder="e.g. Nursery 1")
     
     if st.button("Generate Scripted Lesson"):
         if topic:
-            prompt = f"Expert {sub} teacher for {cat}. Create a 5-step script for {topic}, {grade}. Use 'Teacher Says:' and 'Write on Board:'. Use LaTeX for math."
-            with st.spinner("VIKIDYL AI is drafting..."):
+            prompt = f"""As an expert {sub} teacher for {cat}, create a 5-step script for {topic}, {grade}. 
+            TONE: {tone}.
+            STRUCTURE: 
+            1. Hook/Anticipatory Set
+            2. Instruction (Scripted)
+            3. Guided Practice
+            4. Independent Practice/Classwork
+            5. Clear Student Note for copying.
+            
+            Format using 'Teacher Says:' and 'Write on Board:'. Use LaTeX for math."""
+            
+            with st.spinner(f"VIKIDYL AI is drafting your {tone} lesson..."):
                 chat = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
-                    messages=[{"role": "system", "content": f"You are VIKIDYL AI, specialized in the Nigerian {cat} curriculum."},
+                    messages=[{"role": "system", "content": f"You are VIKIDYL AI, a specialist in {cat} education and {sub}."},
                               {"role": "user", "content": prompt}]
                 )
                 st.session_state['output'] = chat.choices[0].message.content
@@ -106,18 +123,18 @@ with tabs[1]:
     sub_e = st.selectbox("Subject", LEVELS[cat_e], key="se")
     
     c1, c2 = st.columns(2)
-    objs = c1.number_input("MCQs", 5, 60, 20)
-    theory = c2.number_input("Theory", 1, 10, 5)
-    scheme = st.text_area("Topics from Scheme of Work")
+    objs = c1.number_input("Objective Questions", 5, 60, 20)
+    theory = c2.number_input("Theory Questions", 1, 10, 5)
+    scheme = st.text_area("List Topics from Scheme of Work")
 
-    if st.button("Set Examination"):
-        prompt = f"Create a {sub_e} exam for {cat_e}. {objs} MCQs, {theory} Theory questions. Include Answers. Topics: {scheme}."
-        with st.spinner("Generating paper..."):
+    if st.button("Set Examination Paper"):
+        prompt = f"Create a {sub_e} exam for {cat_e}. {objs} MCQs, {theory} Theory questions. Include Answer Key. Topics: {scheme}."
+        with st.spinner("VIKIDYL AI is setting the paper..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "system", "content": "You are VIKIDYL AI, an expert Nigerian Examination Officer."},
                           {"role": "user", "content": prompt}]
-            )
+                )
             st.session_state['output'] = chat.choices[0].message.content
             st.session_state['current_title'] = f"{sub_e} Exam"
 
@@ -126,11 +143,13 @@ if 'output' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['output'])
     file = create_docx(st.session_state['output'], st.session_state.get('current_title', 'Material'))
-    st.download_button("📥 Download Official Word Doc", file, "VIKIDYL_AI_Note.docx")
+    st.download_button("📥 Download Official Word Document", file, "VIKIDYL_AI_Note.docx")
 
-st.markdown(f"""
+# --- 6. FOOTER ---
+st.markdown("""
+    <div style="height: 100px;"></div>
     <div class="footer">
-        <p>Developed by <b>Ufford I I</b> | Contact: <a href="mailto: digitalisedmindset@gmail.com">your@email.com</a><br>
-        © 2026 VIKIDYL AI - Nigerian Education Standard</p>
+        <p>Developed by <b>Ufford I. I.</b> | Contact: <a href="mailto:your@email.com">digitalisedmindset@gmail.com</a><br>
+        © 2026 VIKIDYL AI - Quality Education Standards</p>
     </div>
     """, unsafe_allow_html=True)
