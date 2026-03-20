@@ -5,43 +5,42 @@ from io import BytesIO
 
 def create_docx(text):
     doc = Document()
-    doc.add_heading('Academic Material', 0)
-    doc.add_paragraph(text)
+    doc.add_heading('Ready-to-Use Academic Material', 0)
+    # Cleaning LaTeX symbols for Word export
+    clean_text = text.replace('$', '') 
+    doc.add_paragraph(clean_text)
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
 st.set_page_config(page_title="Edu-Planner Pro", layout="wide")
-st.title("🍎 Advanced Edu-Planner")
+st.title("🍎 Professional Edu-Planner")
 
-# Sidebar Configuration
 api_key = st.sidebar.text_input("Enter Groq API Key", type="password")
 mode = st.sidebar.selectbox("Select Mode", ["Detailed Lesson Note", "Custom Assessment"])
 
-# Persistent storage
 if 'generated_content' not in st.session_state:
     st.session_state['generated_content'] = ""
 
-# --- MODE 1: DETAILED LESSON NOTE ---
 if mode == "Detailed Lesson Note":
-    st.subheader("📚 5-Step Lesson Generator")
-    topic = st.text_input("Topic")
+    st.subheader("📚 Scripted 5-Step Lesson Note")
+    topic = st.text_input("Topic (e.g., Quadratic Equations)")
     grade = st.text_input("Grade Level")
     
-    if st.button("Generate Full Lesson"):
+    if st.button("Generate Ready-to-Use Lesson"):
         if not api_key: st.error("Enter API Key")
         else:
             client = Groq(api_key=api_key)
-            system_msg = """You are an expert Educator. Create a lesson using the 5-Step Approach:
-            1. Anticipatory Set (Hook)
-            2. Instruction (Detailed definitions and core concepts)
-            3. Guided Practice (Worked examples)
-            4. Independent Practice (Classwork)
-            5. Closure (Summary & Homework).
-            IMPORTANT: Include a separate section titled 'STUDENT NOTE' which is a simplified, copy-friendly version for students' notebooks."""
+            # THE KEY CHANGE: Explicit instructions for Math and Scripting
+            system_msg = """You are a Master Teacher. 
+            1. MATH FORMATTING: Use LaTeX for all mathematical symbols and formulas (e.g., use $x^2$ or $\\frac{a}{b}$). 
+            2. TEACHER SCRIPT: Write exactly what the teacher should say. Use 'Teacher Says:' and 'Write on Board:'.
+            3. CONTENT: Follow the 5-step approach.
+            4. STUDENT NOTE: Provide a clear, structured note for students to copy word-for-word. 
+            Do not give advice; give the actual content."""
             
-            with st.spinner("Writing detailed notes..."):
+            with st.spinner("Preparing your script..."):
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[{"role": "system", "content": system_msg},
@@ -49,39 +48,38 @@ if mode == "Detailed Lesson Note":
                 )
                 st.session_state['generated_content'] = completion.choices[0].message.content
 
-# --- MODE 2: CUSTOM ASSESSMENT ---
 else:
     st.subheader("📝 Examination & Test Builder")
     col1, col2 = st.columns(2)
     with col1:
         weeks = st.text_input("Period (e.g., Week 1-3)")
-        num_obj = st.number_input("Number of Objectives (MCQs)", min_value=0, value=10)
+        num_obj = st.number_input("Number of Objectives", min_value=0, value=10)
     with col2:
-        num_theory = st.number_input("Number of Theory/Subjective", min_value=0, value=3)
-        scheme = st.text_area("Paste relevant Scheme of Work for these weeks")
+        num_theory = st.number_input("Number of Theory", min_value=0, value=3)
+        scheme = st.text_area("Paste Scheme of Work")
 
     if st.button("Generate Examination"):
         if not api_key: st.error("Enter API Key")
         else:
             client = Groq(api_key=api_key)
-            prompt = f"""Create a test for {weeks}. 
-            Requirements:
-            - {num_obj} Multiple Choice Questions (Objectives)
-            - {num_theory} Theory/Subjective questions.
-            - Include an Answer Key at the end.
-            Base it on this scheme: {scheme}"""
+            prompt = f"""Create a test for {weeks}. Use LaTeX for all math.
+            - {num_obj} Objectives
+            - {num_theory} Theory questions.
+            - Provide a clear Answer Key.
+            Base it on: {scheme}"""
             
-            with st.spinner("Setting questions..."):
+            with st.spinner("Setting exam..."):
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
-                    messages=[{"role": "system", "content": "You are an Examination Officer."},
+                    messages=[{"role": "system", "content": "You are an Examination Officer. Use LaTeX for math symbols."},
                               {"role": "user", "content": prompt}]
                 )
                 st.session_state['generated_content'] = completion.choices[0].message.content
 
-# --- DOWNLOAD AREA ---
 if st.session_state['generated_content']:
     st.markdown("---")
+    # This line tells Streamlit to render the Math symbols correctly
     st.markdown(st.session_state['generated_content'])
+    
     file = create_docx(st.session_state['generated_content'])
-    st.download_button("📥 Download Word Doc", file, "EduMaterial.docx")
+    st.download_button("📥 Download Word Doc", file, "Lesson_Material.docx")
