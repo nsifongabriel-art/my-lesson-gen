@@ -3,86 +3,84 @@ from groq import Groq
 from docx import Document
 from io import BytesIO
 
-# --- BRANDING & STYLING ---
-st.set_page_config(page_title="Chalkie Clone Pro", page_icon="🎓", layout="centered")
+# --- 1. BRANDING & STYLE ---
+st.set_page_config(page_title="Chalkie AI Pro", page_icon="🎓", layout="centered")
 
-# Custom CSS to make it look "Premium"
 st.markdown("""
     <style>
     .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 20px; background-color: #4A90E2; color: white; }
-    .stTextInput>div>div>input { border-radius: 10px; }
+    .stButton>button { width: 100%; border-radius: 20px; background-color: #2E7D32; color: white; height: 3em; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# Function to create the Word Doc
+# --- 2. THE SECRET CONNECTION ---
+# This looks for "GROQ_API_KEY" inside the Streamlit Secrets box you saw earlier.
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+    client = Groq(api_key=api_key)
+except Exception as e:
+    st.error("🔑 API Key Missing! Go to App Settings -> Secrets and add: GROQ_API_KEY = 'your_key_here'")
+    st.stop()
+
+# --- 3. DOCUMENT EXPORTER ---
 def create_docx(text):
     doc = Document()
-    doc.add_heading('Academic Material', 0)
-    clean_text = text.replace('$', '') 
+    doc.add_heading('Official Academic Material', 0)
+    clean_text = text.replace('$', '') # Clean math symbols for Word
     doc.add_paragraph(clean_text)
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# --- LOGO AND TITLE ---
-st.image("https://cdn-icons-png.flaticon.com/512/3426/3426653.png", width=80) # Replace with your logo URL
-st.title("Chalkie AI: Master Planner")
-st.caption("Empowering Teachers with AI-Driven Curriculum Design")
+# --- 4. THE INTERFACE ---
+st.title("🎓 Chalkie AI: Master Planner")
+st.write("Generate professional, ready-to-use lesson scripts and exams.")
 
-# --- SECURITY: LOAD API KEY FROM SECRETS ---
-# This looks for the key you saved in the Streamlit Settings
-try:
-    api_key = st.secrets["GROQ_API_KEY"]
-except:
-    st.error("API Key not found in Secrets! Please add it to your Streamlit settings.")
-    st.stop()
+tabs = st.tabs(["📝 Lesson Notes", "📊 Exams & Tests"])
 
-client = Groq(api_key=api_key)
-
-# --- APP LOGIC ---
-mode = st.tabs(["📚 Lesson Notes", "📝 Exams & Tests"])
-
-with mode[0]:
-    st.subheader("5-Step Scripted Lesson")
-    topic = st.text_input("Enter Topic", placeholder="e.g. Simultaneous Equations")
-    grade = st.text_input("Grade Level", placeholder="e.g. JSS3")
+with tabs[0]:
+    st.subheader("Scripted 5-Step Lesson")
+    topic = st.text_input("Topic", placeholder="e.g. Photosynthesis")
+    grade = st.text_input("Grade", placeholder="e.g. Primary 5")
     
-    if st.button("Generate Pro Lesson Plan"):
-        system_msg = """You are a Master Teacher. 
-        Format: Use LaTeX for ALL math ($...$). 
-        Style: Write as a DIRECT SCRIPT. Use 'Teacher Says:' and 'Write on Board:'.
-        Sections: 1. Hook, 2. Instruction, 3. Guided Examples, 4. Classwork, 5. Student Copyable Note."""
-        
-        with st.spinner("Writing your professional script..."):
-            completion = client.chat.completions.create(
+    if st.button("Generate Full Lesson Script"):
+        prompt = f"Create a detailed 5-step lesson script (Hook, Instruction, Examples, Classwork, Student Note) for {topic}, Grade {grade}. Use 'Teacher Says:' and 'Write on Board:'. Use LaTeX for math."
+        with st.spinner("Writing your script..."):
+            chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": system_msg},
-                          {"role": "user", "content": f"Topic: {topic}, Grade: {grade}"}]
+                messages=[{"role": "system", "content": "You are a Master Teacher. Provide ready-to-use classroom scripts."},
+                          {"role": "user", "content": prompt}]
             )
-            st.session_state['output'] = completion.choices[0].message.content
+            st.session_state['output'] = chat.choices[0].message.content
 
-with mode[1]:
-    st.subheader("Exam Builder")
-    weeks = st.text_input("Coverage", placeholder="e.g. Weeks 1-6")
+with tabs[1]:
+    st.subheader("Custom Exam Builder")
+    weeks = st.text_input("Period Covered", placeholder="e.g. Weeks 1-4")
     c1, c2 = st.columns(2)
-    obj_count = c1.number_input("Objectives", 5, 50, 10)
-    theory_count = c2.number_input("Theory", 1, 10, 3)
-    scheme = st.text_area("Paste Scheme of Work")
+    objs = c1.number_input("Objective Questions", 5, 50, 10)
+    theory = c2.number_input("Theory Questions", 1, 10, 3)
+    scheme = st.text_area("Paste Scheme of Work Topics")
 
     if st.button("Generate Examination Paper"):
-        with st.spinner("Drafting exam..."):
-            completion = client.chat.completions.create(
+        prompt = f"Create an exam for {weeks}. Include {objs} MCQs and {theory} theory questions with an answer key. Base on: {scheme}. Use LaTeX for math."
+        with st.spinner("Generating exam..."):
+            chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": "You are an Examination Officer. Use LaTeX for math."},
-                          {"role": "user", "content": f"Create {obj_count} OBJs and {theory_count} Theory questions for {weeks} based on: {scheme}"}]
+                messages=[{"role": "system", "content": "You are an Examination Officer."},
+                          {"role": "user", "content": prompt}]
             )
-            st.session_state['output'] = completion.choices[0].message.content
+            st.session_state['output'] = chat.choices[0].message.content
 
-# --- OUTPUT AND DOWNLOAD ---
+# --- 5. RESULTS & DOWNLOAD ---
 if 'output' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['output'])
-    file = create_docx(st.session_state['output'])
-    st.download_button("📥 Download Official Document", file, "Academic_Material.docx")
+    
+    file_data = create_docx(st.session_state['output'])
+    st.download_button(
+        label="📥 Download Word Document",
+        data=file_data,
+        file_name="Chalkie_Material.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
