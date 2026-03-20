@@ -3,10 +3,22 @@ from groq import Groq
 from docx import Document
 from io import BytesIO
 
+# --- BRANDING & STYLING ---
+st.set_page_config(page_title="Chalkie Clone Pro", page_icon="🎓", layout="centered")
+
+# Custom CSS to make it look "Premium"
+st.markdown("""
+    <style>
+    .main { background-color: #f5f7f9; }
+    .stButton>button { width: 100%; border-radius: 20px; background-color: #4A90E2; color: white; }
+    .stTextInput>div>div>input { border-radius: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Function to create the Word Doc
 def create_docx(text):
     doc = Document()
-    doc.add_heading('Ready-to-Use Academic Material', 0)
-    # Cleaning LaTeX symbols for Word export
+    doc.add_heading('Academic Material', 0)
     clean_text = text.replace('$', '') 
     doc.add_paragraph(clean_text)
     buffer = BytesIO()
@@ -14,72 +26,63 @@ def create_docx(text):
     buffer.seek(0)
     return buffer
 
-st.set_page_config(page_title="Edu-Planner Pro", layout="wide")
-st.title("🍎 Professional Edu-Planner")
+# --- LOGO AND TITLE ---
+st.image("https://cdn-icons-png.flaticon.com/512/3426/3426653.png", width=80) # Replace with your logo URL
+st.title("Chalkie AI: Master Planner")
+st.caption("Empowering Teachers with AI-Driven Curriculum Design")
 
-api_key = st.sidebar.text_input("Enter Groq API Key", type="password")
-mode = st.sidebar.selectbox("Select Mode", ["Detailed Lesson Note", "Custom Assessment"])
+# --- SECURITY: LOAD API KEY FROM SECRETS ---
+# This looks for the key you saved in the Streamlit Settings
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except:
+    st.error("API Key not found in Secrets! Please add it to your Streamlit settings.")
+    st.stop()
 
-if 'generated_content' not in st.session_state:
-    st.session_state['generated_content'] = ""
+client = Groq(api_key=api_key)
 
-if mode == "Detailed Lesson Note":
-    st.subheader("📚 Scripted 5-Step Lesson Note")
-    topic = st.text_input("Topic (e.g., Quadratic Equations)")
-    grade = st.text_input("Grade Level")
+# --- APP LOGIC ---
+mode = st.tabs(["📚 Lesson Notes", "📝 Exams & Tests"])
+
+with mode[0]:
+    st.subheader("5-Step Scripted Lesson")
+    topic = st.text_input("Enter Topic", placeholder="e.g. Simultaneous Equations")
+    grade = st.text_input("Grade Level", placeholder="e.g. JSS3")
     
-    if st.button("Generate Ready-to-Use Lesson"):
-        if not api_key: st.error("Enter API Key")
-        else:
-            client = Groq(api_key=api_key)
-            # THE KEY CHANGE: Explicit instructions for Math and Scripting
-            system_msg = """You are a Master Teacher. 
-            1. MATH FORMATTING: Use LaTeX for all mathematical symbols and formulas (e.g., use $x^2$ or $\\frac{a}{b}$). 
-            2. TEACHER SCRIPT: Write exactly what the teacher should say. Use 'Teacher Says:' and 'Write on Board:'.
-            3. CONTENT: Follow the 5-step approach.
-            4. STUDENT NOTE: Provide a clear, structured note for students to copy word-for-word. 
-            Do not give advice; give the actual content."""
-            
-            with st.spinner("Preparing your script..."):
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "system", "content": system_msg},
-                              {"role": "user", "content": f"Topic: {topic}, Grade: {grade}"}]
-                )
-                st.session_state['generated_content'] = completion.choices[0].message.content
+    if st.button("Generate Pro Lesson Plan"):
+        system_msg = """You are a Master Teacher. 
+        Format: Use LaTeX for ALL math ($...$). 
+        Style: Write as a DIRECT SCRIPT. Use 'Teacher Says:' and 'Write on Board:'.
+        Sections: 1. Hook, 2. Instruction, 3. Guided Examples, 4. Classwork, 5. Student Copyable Note."""
+        
+        with st.spinner("Writing your professional script..."):
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "system", "content": system_msg},
+                          {"role": "user", "content": f"Topic: {topic}, Grade: {grade}"}]
+            )
+            st.session_state['output'] = completion.choices[0].message.content
 
-else:
-    st.subheader("📝 Examination & Test Builder")
-    col1, col2 = st.columns(2)
-    with col1:
-        weeks = st.text_input("Period (e.g., Week 1-3)")
-        num_obj = st.number_input("Number of Objectives", min_value=0, value=10)
-    with col2:
-        num_theory = st.number_input("Number of Theory", min_value=0, value=3)
-        scheme = st.text_area("Paste Scheme of Work")
+with mode[1]:
+    st.subheader("Exam Builder")
+    weeks = st.text_input("Coverage", placeholder="e.g. Weeks 1-6")
+    c1, c2 = st.columns(2)
+    obj_count = c1.number_input("Objectives", 5, 50, 10)
+    theory_count = c2.number_input("Theory", 1, 10, 3)
+    scheme = st.text_area("Paste Scheme of Work")
 
-    if st.button("Generate Examination"):
-        if not api_key: st.error("Enter API Key")
-        else:
-            client = Groq(api_key=api_key)
-            prompt = f"""Create a test for {weeks}. Use LaTeX for all math.
-            - {num_obj} Objectives
-            - {num_theory} Theory questions.
-            - Provide a clear Answer Key.
-            Base it on: {scheme}"""
-            
-            with st.spinner("Setting exam..."):
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "system", "content": "You are an Examination Officer. Use LaTeX for math symbols."},
-                              {"role": "user", "content": prompt}]
-                )
-                st.session_state['generated_content'] = completion.choices[0].message.content
+    if st.button("Generate Examination Paper"):
+        with st.spinner("Drafting exam..."):
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "system", "content": "You are an Examination Officer. Use LaTeX for math."},
+                          {"role": "user", "content": f"Create {obj_count} OBJs and {theory_count} Theory questions for {weeks} based on: {scheme}"}]
+            )
+            st.session_state['output'] = completion.choices[0].message.content
 
-if st.session_state['generated_content']:
+# --- OUTPUT AND DOWNLOAD ---
+if 'output' in st.session_state:
     st.markdown("---")
-    # This line tells Streamlit to render the Math symbols correctly
-    st.markdown(st.session_state['generated_content'])
-    
-    file = create_docx(st.session_state['generated_content'])
-    st.download_button("📥 Download Word Doc", file, "Lesson_Material.docx")
+    st.markdown(st.session_state['output'])
+    file = create_docx(st.session_state['output'])
+    st.download_button("📥 Download Official Document", file, "Academic_Material.docx")
