@@ -130,7 +130,7 @@ if 'output' in st.session_state:
 
 st.markdown(f"""
     <div class="footer">
-        <p>Developed by <b>Your Name</b> | Contact: <a href="mailto:your@email.com">your@email.com</a><br>
+        <p>Developed by <b>Ufford I I</b> | Contact: <a href="mailto: digitalisedmindset@gmail.com">your@email.com</a><br>
         © 2026 VIKIDYL AI - Nigerian Education Standard</p>
     </div>
     """, unsafe_allow_html=True)
