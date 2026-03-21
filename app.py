@@ -19,10 +19,14 @@ st.markdown("""
         background-color: #f1f1f1; text-align: center; 
         padding: 10px; font-size: 14px; border-top: 1px solid #e0e0e0; z-index: 99; 
     }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: #e3f2fd; border-radius: 10px 10px 0 0; padding: 10px; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. DATA & CONNECTION ---
+# --- 2. DATA ---
 CLASSES = [
     "Pre-Nursery", "Nursery 1", "Nursery 2", 
     "Primary 1", "Primary 2", "Primary 3", "Primary 4", "Primary 5", "Primary 6",
@@ -35,13 +39,13 @@ SUBJECT_LISTS = {
     "Secondary": ["Mathematics", "English", "Biology", "Physics", "Chemistry", "Economics", "Civic Education", "Further Maths", "Government", "Literature"]
 }
 
+# --- 3. CONNECTION ---
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception:
-    st.error("🔑 API Key Missing! Please add GROQ_API_KEY to your Streamlit Secrets.")
+    st.error("🔑 API Key Missing! Please add GROQ_API_KEY to Streamlit Secrets.")
     st.stop()
 
-# --- 3. HELPER FUNCTIONS ---
 def create_docx(text, title):
     doc = Document()
     doc.add_heading(f'VIKIDYL AI - {title}', 0)
@@ -52,102 +56,89 @@ def create_docx(text, title):
     buffer.seek(0)
     return buffer
 
-# --- 4. THE INTERFACE ---
+# --- 4. INTERFACE ---
 st.title("🎓 VIKIDYL AI Professional")
-st.caption("NERDC 2026 Curriculum Standard • Comprehensive Educator Suite")
+st.caption("Official 2026 NERDC Curriculum Standards")
 
-tabs = st.tabs(["📝 Quick Lesson", "📊 Assessment Builder", "📅 Weekly Scheme & Full Notes"])
+tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 Weekly Scheme & Full Notes"])
 
-# --- TAB 1: QUICK TOOLS (RESTORED) ---
+# --- TAB 1: QUICK TOOLS ---
 with tabs[0]:
     st.subheader("Fast 5-Step Lesson Script")
-    col_a, col_b = st.columns(2)
-    q_class = col_a.selectbox("Select Class", CLASSES, key="q_cls")
-    q_tone = col_b.selectbox("Teaching Tone", ["Playful", "Formal", "Inquiry-based"], key="q_tone")
-    
-    q_sub = st.text_input("Subject/Topic", placeholder="e.g. Addition of Numbers", key="q_sub_input")
-    
-    if st.button("Generate Quick Script"):
-        if q_sub:
-            prompt = f"Create a quick 5-step lesson script for {q_class} on {q_sub}. Tone: {q_tone}. Include 'Teacher Says' and 'Write on Board'."
-            with st.spinner("VIKIDYL AI is writing..."):
-                chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
-                st.session_state['output'] = chat.choices[0].message.content
-                st.session_state['title'] = f"Quick Lesson: {q_sub}"
-
-# --- TAB 2: ASSESSMENT (RESTORED) ---
-with tabs[1]:
-    st.subheader("Professional Test & Exam Generator")
-    col_1, col_2 = st.columns(2)
-    e_class = col_1.selectbox("Class Level", CLASSES, key="e_cls")
-    e_type = col_2.selectbox("Assessment Type", ["Quiz", "Mid-Term Exam", "Full Term Exam"])
-    
-    e_sub = st.text_input("Subject", key="e_sub_input")
-    e_topics = st.text_area("Topics to cover (separate with commas)")
-    
     c1, c2 = st.columns(2)
-    objs = c1.number_input("Number of MCQs", 5, 50, 10)
-    theory = c2.number_input("Number of Theory Questions", 0, 10, 3)
+    q_cls = c1.selectbox("Class", CLASSES, key="q_cls")
+    q_ton = c2.selectbox("Tone", ["Playful", "Formal", "Inquiry-based"], key="q_ton")
+    q_sub = st.text_input("Topic", placeholder="e.g. Parts of a Plant", key="q_in")
+    
+    if st.button("Generate Script"):
+        if q_sub:
+            with st.spinner("VIKIDYL AI is drafting..."):
+                chat = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": f"Create a 5-step script for {q_cls} on {q_sub}. Tone: {q_ton}. Use 'Teacher Says' and 'Write on Board'."}]
+                )
+                st.session_state['output'] = chat.choices[0].message.content
+                st.session_state['title'] = f"Quick Script: {q_sub}"
 
+# --- TAB 2: ASSESSMENT ---
+with tabs[1]:
+    st.subheader("Test & Exam Generator")
+    c3, c4 = st.columns(2)
+    e_cls = c3.selectbox("Class", CLASSES, key="e_cls")
+    e_typ = c4.selectbox("Type", ["Quiz", "Mid-Term", "Exam"], key="e_typ")
+    e_sub = st.text_input("Subject", key="e_sub")
+    e_top = st.text_area("Topics (comma separated)", key="e_top")
+    
     if st.button("Generate Assessment"):
-        prompt = f"Create a {e_type} for {e_class} {e_sub}. Include {objs} Multiple Choice Questions and {theory} Theory questions. Based on: {e_topics}. Provide an Answer Key."
         with st.spinner("Setting questions..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
+            chat = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": f"Create {e_typ} for {e_cls} {e_sub} on {e_top}. Include 10 MCQs, 3 Theory, and Answer Key."}]
+            )
             st.session_state['output'] = chat.choices[0].message.content
-            st.session_state['title'] = f"{e_type}: {e_sub}"
+            st.session_state['title'] = f"{e_typ}: {e_sub}"
 
 # --- TAB 3: WEEKLY SCHEME & NOTES ---
 with tabs[2]:
-    st.subheader("Detailed Weekly Planner (NERDC Format)")
+    st.subheader("NERDC Full Lesson Planner")
     col_in, col_out = st.columns([1, 2])
     
     with col_in:
-        sel_class = st.selectbox("Specific Class", CLASSES, key="f_cls")
-        if "Nursery" in sel_class or "Pre" in sel_class:
-            subs = SUBJECT_LISTS["Nursery"]
-        elif "Primary" in sel_class:
-            subs = SUBJECT_LISTS["Primary"]
-        else:
-            subs = SUBJECT_LISTS["Secondary"]
+        f_cls = st.selectbox("Specific Class", CLASSES, key="f_cls")
+        group = "Nursery" if "Nursery" in f_cls else "Primary" if "Primary" in f_cls else "Secondary"
+        f_sub = st.selectbox("Subject", SUBJECT_LISTS[group], key="f_sub")
+        f_mod = st.radio("Action", ["12-Week Scheme", "Full Lesson Note"], key="f_mod")
+        
+        if f_mod == "Full Lesson Note":
+            f_wk = st.number_input("Week", 1, 12, 1)
+            f_top = st.text_input("Topic")
             
-        sel_sub = st.selectbox("Subject", subs, key="f_sub")
-        term = st.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"], key="f_term")
-        mode = st.radio("Action", ["Generate 12-Week Scheme", "Generate Weekly Note of Lesson"], key="f_mode")
-        
-        if mode == "Generate Weekly Note of Lesson":
-            week = st.number_input("Week", 1, 12, 1, key="f_wk")
-            topic = st.text_input("Weekly Topic", key="f_top")
-        
         if st.button("Generate Professional Plan"):
-            if mode == "Generate 12-Week Scheme":
-                prompt = f"Create a 12-week NERDC Scheme of Work for {sel_class}, {sel_sub} for {term}."
-            else:
-                prompt = f"Write a full NERDC Lesson Note for {sel_class}, {sel_sub}, Week {week}, Topic: {topic}. Include Objectives, Instructional Materials, Step-by-Step Presentation, and Student Note."
-            
+            prompt = f"NERDC Format: {'Scheme of Work' if f_mod == '12-Week Scheme' else 'Lesson Note'} for {f_cls} {f_sub}. {'Week '+str(f_wk)+' Topic: '+f_top if f_mod != '12-Week Scheme' else ''}. Include Teacher and Pupil Activities."
             with st.spinner("Generating..."):
                 chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
                 st.session_state['output'] = chat.choices[0].message.content
-                st.session_state['title'] = f"{sel_class} {sel_sub} Plan"
+                st.session_state['title'] = f"{f_cls} {f_sub}"
 
-# --- 5. GLOBAL OUTPUT & DOWNLOAD ---
+# --- 5. RESULTS & ACTIONS ---
 if 'output' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['output'])
     
-    file_data = create_docx(st.session_state['output'], st.session_state.get('title', 'Material'))
-    st.download_button(
-        label="📥 Download Word Document",
-        data=file_data,
-        file_name="VIKIDYL_AI_Output.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    c_d, c_c = st.columns(2)
+    
+    file = create_docx(st.session_state['output'], st.session_state['title'])
+    c_d.download_button("📥 Download Word Doc", file, f"{st.session_state['title']}.docx")
+    
+    if c_c.button("🗑️ Clear Results"):
+        del st.session_state['output']
+        st.rerun()
 
 # --- 6. FOOTER ---
-# Update "yourname@email.com" to your actual email!
 st.markdown(f"""
     <div style="height: 100px;"></div>
     <div class="footer">
         <p>Developed by <b>Ufford I.I.</b> | Support: <a href="mailto:yourname@email.com">digitalisedmindset@gmail.com</a><br>
-        © 2026 VIKIDYL AI - Empowering Educators Worldwide</p>
+        © 2026 VIKIDYL AI - Nigerian Education Standard</p>
     </div>
     """, unsafe_allow_html=True)
