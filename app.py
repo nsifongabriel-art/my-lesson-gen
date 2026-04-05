@@ -13,7 +13,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. PRE-LISTED SUBJECT DATA ---
+# --- 2. PRE-LISTED SUBJECT DATA (FIXED & IMPLEMENTED) ---
 DATA = {
     "Pre-Nursery/Nursery": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes", "Creative Arts", "Science Experience"],
     "Primary (Basic 1-6)": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "Nigerian History", "P.H.E", "Agriculture", "Home Economics", "Cultural Arts"],
@@ -21,7 +21,7 @@ DATA = {
     "Senior College (SSS 1-3)": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics", "Government", "Literature", "Geography", "Commerce", "Financial Accounting"]
 }
 
-# --- 3. CONNECTION & HELPERS ---
+# --- 3. CONNECTION ---
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception:
@@ -39,90 +39,93 @@ def create_docx(text, title):
     return buffer
 
 # --- 4. THE INTERFACE ---
-st.title("🎓 VIKIDYL AI: Professional Suite")
-st.caption("2026 NERDC Standard • Serialized 3-Term Curriculum")
+st.title("🎓 VIKIDYL AI Professional")
+st.caption("NERDC 2026 Serialized Curriculum • Enhanced Professional Suite")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Detailed Notes"])
 
 # --- TAB 1: QUICK TOOLS ---
 with tabs[0]:
     st.subheader("Fast Lesson Script")
-    q_lvl = st.selectbox("School Level", list(DATA.keys()), key="q_lvl")
-    q_sub = st.selectbox("Subject", DATA[q_lvl], key="q_sub")
-    q_top = st.text_input("Specific Topic", key="q_top")
-    if st.button("Generate Script"):
-        prompt = f"Quick 5-step script for {q_lvl} {q_sub}: {q_top}. Include Teacher Says and Write on Board."
-        with st.spinner("Writing..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
+    lvl_q = st.selectbox("Select Level", list(DATA.keys()), key="lvl_q")
+    sub_q = st.selectbox("Select Subject", DATA[lvl_q], key="sub_q")
+    top_q = st.text_input("Topic", key="top_q")
+    if st.button("Generate Quick Script"):
+        with st.spinner("Processing..."):
+            chat = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": f"Quick 5-step script for {lvl_q} {sub_q}: {top_q}."}]
+            )
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 2: ASSESSMENT BUILDER ---
+# --- TAB 2: ASSESSMENT BUILDER (MODERATION IMPLEMENTED) ---
 with tabs[1]:
     st.subheader("Test & Exam Moderator")
     col1, col2 = st.columns(2)
-    a_lvl = col1.selectbox("Level", list(DATA.keys()), key="a_lvl")
-    a_sub = col2.selectbox("Subject", DATA[a_lvl], key="a_sub")
+    lvl_a = col1.selectbox("Level", list(DATA.keys()), key="lvl_a")
+    sub_a = col2.selectbox("Subject", DATA[lvl_a], key="sub_a")
     
-    # MODERATION SELECTOR
-    a_mode = st.select_slider("Moderation Style", options=["Fun & Engaging", "Balanced", "Serious Academic", "Strict Exam Mode"])
-    a_top = st.text_area("Topics to cover")
+    # MODERATION SLIDER
+    mod_a = st.select_slider("Select Exam Tone/Moderation", 
+                            options=["Fun & Practical", "Standard Classroom", "Serious Academic", "Strict External Exam Style"])
     
-    if st.button("Generate Moderated Assessment"):
-        prompt = f"Generate a {a_mode} style exam for {a_lvl} {a_sub}. Topics: {a_top}. Include MCQs, Theory, and Answer Key."
-        with st.spinner(f"Setting {a_mode} questions..."):
+    top_a = st.text_area("List Topics for Assessment")
+    if st.button("Generate Moderated Exam"):
+        prompt = f"Create a {mod_a} style exam for {lvl_a} {sub_a}. Topics: {top_a}. Include MCQs and Theory with answers."
+        with st.spinner(f"Setting {mod_a} questions..."):
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 3: SCHEME & DETAILED NOTES ---
+# --- TAB 3: SCHEME & NOTES (SERIALIZED WEEKS IMPLEMENTED) ---
 with tabs[2]:
-    st.subheader("Full Serialized Planner")
+    st.subheader("Serialized Planner (Term 1 - 3)")
     c1, c2 = st.columns([1, 1])
     
     with c1:
-        f_lvl = st.selectbox("School Level", list(DATA.keys()), key="f_lvl")
-        f_sub = st.selectbox("Subject", DATA[f_lvl], key="f_sub")
-        f_mod = st.radio("Action", ["Generate Full 3-Term Serialized Scheme", "Generate Detailed Weekly Lesson Note"])
+        lvl_f = st.selectbox("Level", list(DATA.keys()), key="lvl_f")
+        sub_f = st.selectbox("Subject", DATA[lvl_f], key="sub_f")
+        mode_f = st.radio("Action", ["Serialized 3-Term Scheme (Full Year)", "Detailed Weekly Lesson Note"])
     
     with c2:
-        st.write("📂 **Reference Upload (Optional Override)**")
-        st.file_uploader("Upload Scheme Image", type=["jpg", "png", "pdf"])
-        st.text_area("Paste Custom Topics here", height=70, key="manual_ref")
+        st.info("📎 Optional: Upload specific curriculum to override standard NERDC.")
+        st.file_uploader("Upload Image/PDF", type=["jpg", "png", "pdf"])
+        manual_f = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
-    if f_mod == "Generate Detailed Weekly Lesson Note":
+    if mode_f == "Detailed Weekly Lesson Note":
         st.write("---")
         n1, n2 = st.columns(2)
-        f_trm = n1.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"])
-        f_wk = n2.selectbox("Week", [f"Week {i}" for i in range(1, 13)])
-        f_top = st.text_input("Enter Topic Name")
+        trm_f = n1.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"])
+        # PRE-LISTED SERIALIZED WEEKS
+        wk_list = [f"Week {i}" for i in range(1, 13)]
+        wk_f = n2.selectbox("Select Week", wk_list)
+        top_f = st.text_input("Enter Topic Name")
 
-    if st.button("🚀 Process NERDC Material"):
-        if f_mod == "Generate Full 3-Term Serialized Scheme":
-            prompt = f"Create a serialized 3-term scheme for {f_lvl} {f_sub}. List as: 1st Term (Week 1-12), 2nd Term (Week 1-12), 3rd Term (Week 1-12). Include Topics and Objectives."
+    if st.button("🚀 Generate NERDC Material"):
+        if mode_f == "Serialized 3-Term Scheme (Full Year)":
+            prompt = f"Generate a full year serialized scheme of work for {lvl_f} {sub_f}. List Week 1-12 for 1st Term, Week 1-12 for 2nd Term, and Week 1-12 for 3rd Term separately."
         else:
-            prompt = f"""Write a comprehensive NERDC Lesson Note for {f_lvl}, {f_sub}.
-            TERM: {f_trm} | WEEK: {f_wk} | TOPIC: {f_top}.
+            prompt = f"""Write a comprehensive NERDC Lesson Note for {lvl_f}, {sub_f}.
+            TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}.
             
-            FOLLOW THIS 18-POINT OUTLINE:
-            1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge.
-            14. PRESENTATION IN STEPS (Detailed Teacher/Pupil Activities).
-            15. WORKED EXAMPLES WITH FULL SOLUTIONS.
-            16. CLASSWORK & HOMEWORK (Minimum 5 questions each).
-            17. EVALUATION & CONCLUSION.
-            18. FULL STUDENT NOTE (Detailed enough for their notebooks).
+            STRUCTURE:
+            1-13. Official NERDC Outlines (Subject to Previous Knowledge)
+            14. PRESENTATION: Detailed Teacher vs Pupil Activities.
+            15. WORKED EXAMPLES: At least 3 detailed examples with full solutions.
+            16. CLASSWORK & HOMEWORK: Specific questions for students.
+            17-18. EVALUATION, CONCLUSION & STUDENT NOTE.
             """
-        
-        with st.spinner("AI is generating professional content..."):
+        with st.spinner("AI is generating..."):
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- 5. RESULTS ---
+# --- 5. RESULTS & EXPORT ---
 if 'out' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['out'])
     
-    f_data = create_docx(st.session_state['out'], "VIKIDYL_AI_Output")
+    file = create_docx(st.session_state['out'], "VIKIDYL_Document")
     col_d, col_c = st.columns(2)
-    col_d.download_button("📥 Download Official Word Doc", f_data, "VIKIDYL_AI.docx")
+    col_d.download_button("📥 Download Official Word Doc", file, "VIKIDYL_AI.docx")
     if col_c.button("🗑️ Reset Page"):
         del st.session_state['out']
         st.rerun()
