@@ -14,9 +14,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. MATH & SYMBOL CLEANER (FOR PRINT INTEGRITY) ---
+# --- 2. MATH SYMBOL CLEANER ---
 def format_math_for_print(text):
-    """Converts LaTeX code into clear, printable text symbols."""
     subs = {
         r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)',
         r'\\sqrt\{(.+?)\}': r'√(\1)',
@@ -27,7 +26,7 @@ def format_math_for_print(text):
         text = re.sub(pattern, replacement, text)
     return text
 
-# --- 3. CLASS & SUBJECT DATABASE (SERIALIZED) ---
+# --- 3. CLASS & SUBJECT DATABASE ---
 CURRICULUM_DATA = {
     "Nursery": {
         "Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"],
@@ -67,9 +66,8 @@ def create_docx(text, title):
 st.title("🎓 VIKIDYL AI Professional")
 st.caption("NERDC 2026 Standards • Serialized 12-Week Planning")
 
-tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Detailed Notes"])
+tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# --- TAB 3: SCHEME & NOTES ---
 with tabs[2]:
     st.subheader("Official Serialized Planner & Note Generator")
     col_input, col_ref = st.columns([1, 1])
@@ -85,6 +83,9 @@ with tabs[2]:
         st.file_uploader("Upload Image/PDF", type=["jpg", "png", "pdf"])
         manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
+    # Initialize variables to prevent NameError
+    trm, wk, top = "N/A", "N/A", "N/A"
+
     if mode == "Detailed Weekly Lesson Note":
         st.write("---")
         n1, n2, n3 = st.columns(3)
@@ -96,38 +97,32 @@ with tabs[2]:
         ref = f"Reference: {manual_ref}" if manual_ref else "Use standard NERDC 2026 curriculum."
         
         if mode == "Full Serialized Termly Scheme (Week 1-12)":
-            prompt = f"""Generate a full serialized 12-week scheme of work for {cls} {sub}. 
-            CRITICAL: List Week 1, Week 2, Week 3... all the way to Week 12 individually. 
-            Do NOT combine weeks. For each week, provide the Topic and Behavioral Objectives. {ref}"""
+            prompt = f"Generate a full serialized 12-week scheme for {cls} {sub}. List Week 1 through Week 12 individually. Do NOT combine weeks. Provide Topic and Objectives for each. {ref}"
+            st.session_state['t'] = f"{cls}_{sub}_Scheme"
         else:
-            prompt = f"""Write a comprehensive Lesson Note for {cls}, {sub}.
-            TERM: {trm} | WEEK: {wk} | TOPIC: {top}. {ref}
-            
-            STRUCTURE (FOLLOW 18-POINT OUTLINE STRICTLY):
-            1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching and Learning Resources, 13. Previous Knowledge.
+            prompt = f"""Write a comprehensive Lesson Note for {cls}, {sub}. TERM: {trm} | WEEK: {wk} | TOPIC: {top}. {ref}
+            STRUCTURE (18 POINTS):
+            1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge.
             14. PRESENTATION: Detailed Step-by-Step Teacher vs Pupil Activities.
-            15. WORKED EXAMPLES: Detailed examples with solutions using clear text math symbols.
-            16. CLASS ACTIVITIES (IF ANY).
-            17. EVALUATION.
-            18. CONCLUSION / ASSIGNMENT.
-            Include a FULL STUDENT NOTE at the end. Use clear symbols like x/y, √x, x²."""
+            15. WORKED EXAMPLES: At least 3 detailed examples with solutions (use clear math symbols).
+            16. CLASS ACTIVITIES. 17. EVALUATION. 18. CONCLUSION/ASSIGNMENT. Include FULL STUDENT NOTE."""
+            st.session_state['t'] = f"{cls}_{sub}_{wk}"
 
-        with st.spinner("Processing..."):
+        with st.spinner("VIKIDYL AI is drafting..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": "Expert NERDC consultant. Never combine weeks. Use printable symbols."},
+                messages=[{"role": "system", "content": "Expert Nigerian curriculum consultant. Use clear printable symbols."},
                           {"role": "user", "content": prompt}]
             )
             st.session_state['out'] = chat.choices[0].message.content
-            st.session_state['t'] = f"{cls}_{sub}_{wk}"
 
 # --- 6. RESULTS & FOOTER ---
 if 'out' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['out'])
-    file = create_docx(st.session_state['out'], st.session_state['t'])
+    file = create_docx(st.session_state['out'], st.session_state.get('t', 'Output'))
     c_d, c_c = st.columns(2)
-    c_d.download_button("📥 Download Word Doc", file, f"{st.session_state['t']}.docx")
+    c_d.download_button("📥 Download Word Doc", file, f"{st.session_state.get('t', 'File')}.docx")
     if c_c.button("🗑️ Reset"):
         del st.session_state['out']
         st.rerun()
