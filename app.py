@@ -3,6 +3,7 @@ from groq import Groq
 from docx import Document
 from io import BytesIO
 import re
+import pandas as pd
 from datetime import datetime
 
 # --- 1. BRANDING & STYLE ---
@@ -15,186 +16,152 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SECURITY LAYER (ADMIN CONTROL) ---
-# EDIT THIS LIST TO ADD/REMOVE CODES
-# Format: "CODE": "YYYY-MM-DD"
-VALID_CODES = {
-    "VIK-2026-PRO": "2026-12-31",  
-    "VIK-TRIAL-01": "2026-04-15",  
-    "UFFORD-ADMIN": "2027-01-01"   
-}
+# --- 2. LIVE SECURITY LAYER (GOOGLE SHEETS) ---
+# This uses the link you just provided
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1Q3UQhyOt8YS800kJ2aMw3bbsVpji-JUy_jU1shoeHYs/edit#gid=0"
 
-def check_access(code):
-    if code in VALID_CODES:
-        expiry_date = datetime.strptime(VALID_CODES[code], "%Y-%m-%d")
-        if datetime.now() <= expiry_date:
-            return True, expiry_date.strftime("%d %B %Y")
-        else:
-            return False, "Expired"
-    return False, "Invalid"
+def get_live_codes():
+    try:
+        # Auto-convert to CSV export link
+        base_url = SHEET_URL.split('/edit')[0]
+        csv_url = f"{base_url}/export?format=csv"
+        df = pd.read_csv(csv_url)
+        # Standardize column names
+        df.columns = [c.strip().lower() for c in df.columns]
+        return dict(zip(df['code'].astype(str), df['expiry'].astype(str)))
+    except Exception as e:
+        # Master backup code if the sheet link fails or is private
+        return {"VIK-ADMIN-2026": "2027-01-01"}
 
-# Session State for Authentication
+def check_access(user_input):
+    valid_codes = get_live_codes()
+    if user_input in valid_codes:
+        try:
+            expiry_str = valid_codes[user_input].strip()
+            # Expecting YYYY-MM-DD in the sheet
+            expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d")
+            if datetime.now() <= expiry_date:
+                return True, expiry_date.strftime("%d %B %Y")
+            else:
+                return False, "Expired"
+        except:
+            return False, "Date Error in Sheet (Use YYYY-MM-DD)"
+    return False, "Invalid Code"
+
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 
 if not st.session_state['authenticated']:
     st.title("🔐 VIKIDYL AI - Secure Access")
-    st.info("Developed by Ufford I.I. - Vikidyl Models Consult")
-    
+    st.info("Authorized Personnel Only - Vikidyl Models Consult")
     user_code = st.text_input("Enter Teacher Access Code", type="password")
     if st.button("Unlock System"):
         is_valid, status = check_access(user_code)
         if is_valid:
             st.session_state['authenticated'] = True
             st.session_state['expiry'] = status
-            st.success(f"Access Granted! Valid until: {status}")
             st.rerun()
         else:
-            st.error(f"Access Denied: Code is {status}")
-    st.stop() # Stops unauthorized users from seeing the content below
+            st.error(f"Access Denied: {status}")
+    st.stop()
 
-# --- 3. MATH SYMBOL CLEANER ---
+# --- 3. UTILITIES & MATH CLEANER ---
 def format_math_for_print(text):
-    subs = {
-        r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)',
-        r'\\sqrt\{(.+?)\}': r'√(\1)',
-        r'\\pm': '±', r'\\times': '×', r'\\div': '÷',
-        r'\^2': '²', r'\^3': '³', r'\$': '', r'\\': ''
-    }
+    subs = {r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)', r'\\sqrt\{(.+?)\}': r'√(\1)', r'\\pm': '±', r'\\times': '×', r'\\div': '÷', r'\^2': '²', r'\^3': '³', r'\$': '', r'\\': ''}
     for pattern, replacement in subs.items():
         text = re.sub(pattern, replacement, text)
     return text
 
-# --- 4. CURRICULUM DATABASE ---
-CURRICULUM_DATA = {
-    "Nursery": {
-        "Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"],
-        "Subjects": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes", "Science Experience"]
-    },
-    "Primary": {
-        "Classes": ["Basic 1", "Basic 2", "Basic 3", "Basic 4", "Basic 5", "Basic 6"],
-        "Subjects": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "Nigerian History", "P.H.E", "Agriculture", "Home Economics"]
-    },
-    "Junior Secondary": {
-        "Classes": ["JSS 1", "JSS 2", "JSS 3"],
-        "Subjects": ["Mathematics", "English", "Basic Science", "Basic Technology", "Business Studies", "Civic Education", "Social Studies"]
-    },
-    "Senior Secondary": {
-        "Classes": ["SSS 1", "SSS 2", "SSS 3"],
-        "Subjects": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics", "Government", "Food and Nutrition", "Financial Accounting"]
-    }
-}
-
-# --- 5. CONNECTION ---
-try:
-    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-except Exception:
-    st.error("🔑 API Key Missing! Check Streamlit Secrets.")
-    st.stop()
-
 def create_docx(text, title):
-    doc = Document()
-    doc.add_heading(f'VIKIDYL AI - {title}', 0)
+    doc = Document(); doc.add_heading(f'VIKIDYL AI - {title}', 0)
     doc.add_paragraph(format_math_for_print(text))
-    buffer = BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
+    buffer = BytesIO(); doc.save(buffer); buffer.seek(0)
     return buffer
 
-# --- 6. MAIN INTERFACE (Only visible after login) ---
-st.sidebar.success(f"Access Active")
+# --- 4. CURRICULUM DATA ---
+CURRICULUM_DATA = {
+    "Nursery": {"Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"], "Subjects": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes", "Science Experience"]},
+    "Primary": {"Classes": ["Basic 1", "Basic 2", "Basic 3", "Basic 4", "Basic 5", "Basic 6"], "Subjects": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "Nigerian History", "P.H.E", "Agriculture", "Home Economics"]},
+    "Junior Secondary": {"Classes": ["JSS 1", "JSS 2", "JSS 3"], "Subjects": ["Mathematics", "English", "Basic Science", "Basic Technology", "Business Studies", "Civic Education", "Social Studies"]},
+    "Senior Secondary": {"Classes": ["SSS 1", "SSS 2", "SSS 3"], "Subjects": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics", "Government", "Food and Nutrition", "Financial Accounting"]}
+}
+
+# --- 5. MAIN APP INTERFACE ---
+try:
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+except:
+    st.error("🔑 Groq API Key missing in Streamlit Secrets!")
+    st.stop()
+
+st.sidebar.success(f"Teacher Access: Active")
 st.sidebar.write(f"Expires: {st.session_state['expiry']}")
 if st.sidebar.button("Logout"):
     st.session_state['authenticated'] = False
     st.rerun()
 
 st.title("🎓 VIKIDYL AI Professional")
-st.caption("NERDC 2026 Standards • Full 3-Term Serialized Planning")
-
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
 # --- TAB 1: QUICK TOOLS ---
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
-    cls_q = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_q]["Classes"], key="cls_q")
+    cls_q = st.selectbox("Class", CURRICULUM_DATA[lvl_q]["Classes"], key="cls_q")
     sub_q = st.selectbox("Subject", CURRICULUM_DATA[lvl_q]["Subjects"], key="sub_q")
-    top_q = st.text_input("Topic", placeholder="e.g. Simple Interest", key="top_q")
-    
-    if st.button("Generate Quick Script"):
-        if top_q:
-            prompt_q = f"Write a quick lesson script for {cls_q} {sub_q}: {top_q}. Focus on 'Teacher Says' and 'Write on Board'."
-            with st.spinner("Drafting script..."):
-                chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_q}])
-                st.session_state['out'] = chat.choices[0].message.content
-                st.session_state['t'] = f"QuickScript_{cls_q}_{sub_q}"
+    top_q = st.text_input("Topic", key="top_q")
+    if st.button("Generate Script"):
+        with st.spinner("Drafting..."):
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Script for {cls_q} {sub_q}: {top_q}"}])
+            st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 2: ASSESSMENT BUILDER ---
+# --- TAB 2: ASSESSMENT ---
 with tabs[1]:
-    st.subheader("Automated Exam & Test Generator")
-    c1, c2 = st.columns(2)
-    with c1:
-        lvl_a = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
-        cls_a = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
-        sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
-    with c2:
-        diff_a = st.selectbox("Tone/Difficulty", ["Standard", "Moderate", "Fun"], key="diff_a")
-        top_a = st.text_area("Topics to Cover", key="top_a")
-    
+    st.subheader("Assessment Builder")
+    lvl_a = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
+    cls_a = st.selectbox("Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
+    sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
+    diff_a = st.selectbox("Tone", ["Standard", "Moderate", "Fun"], key="diff_a")
+    top_a = st.text_area("Topics", key="top_a")
     if st.button("Generate Assessment"):
-        if top_a:
-            tone_map = {"Fun": "engaging and gamified", "Moderate": "balanced recall and application", "Standard": "high rigor academic style"}
-            prompt_a = f"Create a {diff_a} level assessment for {cls_a} {sub_a} on topics: {top_a}. Use {tone_map[diff_a]}. Include MCQs, Theory, and Answer Key."
-            with st.spinner("Generating questions..."):
-                chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_a}])
-                st.session_state['out'] = chat.choices[0].message.content
-                st.session_state['t'] = f"Exam_{cls_a}_{sub_a}"
+        with st.spinner("Creating questions..."):
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Create {diff_a} exam for {cls_a} {sub_a} on: {top_a}"}])
+            st.session_state['out'] = chat.choices[0].message.content
 
 # --- TAB 3: NERDC SCHEME & NOTES ---
 with tabs[2]:
-    st.subheader("Official Serialized Planner & Note Generator")
-    col1, col2 = st.columns([1, 1])
+    st.subheader("NERDC Serialized Planner")
+    col1, col2 = st.columns(2)
     with col1:
         lvl_f = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
-        cls_f = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_f]["Classes"], key="cls_f")
+        cls_f = st.selectbox("Class", CURRICULUM_DATA[lvl_f]["Classes"], key="cls_f")
         sub_f = st.selectbox("Subject", CURRICULUM_DATA[lvl_f]["Subjects"], key="sub_f")
-        trm_f = st.selectbox("Target Term", ["1st Term", "2nd Term", "3rd Term", "Full Year"], key="trm_f")
+        trm_f = st.selectbox("Term", ["1st Term", "2nd Term", "3rd Term", "Full Year"], key="trm_f")
     with col2:
         mode_f = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
-        manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
-
+        manual_ref = st.text_area("Manual Reference (Optional)", height=70)
+    
     wk_f, top_f = "N/A", "N/A"
     if mode_f == "Detailed Weekly Lesson Note":
-        st.write("---")
         n1, n2 = st.columns(2)
-        wk_f = n1.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
-        top_f = n2.text_input("Enter Topic Name")
+        wk_f = n1.selectbox("Week", [f"Week {i}" for i in range(1, 13)])
+        top_f = n2.text_input("Topic Name")
 
     if st.button("🚀 Generate NERDC Material"):
-        ref = f"Reference: {manual_ref}" if manual_ref else "Use standard NERDC 2026 curriculum."
         if mode_f == "Serialized Scheme (Week 1-12)":
-            prompt_f = f"Generate a serialized 12-week scheme for {cls_f} {sub_f} for {trm_f}. List Week 1 through 12 individually. Topic and Objectives for each. {ref}"
-            st.session_state['t'] = f"{cls_f}_{sub_f}_{trm_f}_Scheme"
+            p = f"Serialized 12-week scheme for {cls_f} {sub_f} {trm_f}. List Week 1 to 12 individually. Objectives for each. {manual_ref}"
         else:
-            prompt_f = f"""Write a comprehensive Lesson Note for {cls_f}, {sub_f}. TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}. {ref}
-            STRUCTURE: 1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge, 14. PRESENTATION (Step-by-Step), 15. WORKED EXAMPLES, 16. CLASS ACTIVITIES, 17. EVALUATION, 18. CONCLUSION/ASSIGNMENT.
-            Include a FULL STUDENT NOTE at the end."""
-            st.session_state['t'] = f"{cls_f}_{sub_f}_{wk_f}"
-
-        with st.spinner("Drafting..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_f}])
+            p = f"18-point lesson note for {cls_f} {sub_f} {trm_f} {wk_f} {top_f}. Follow 18-point format strictly. {manual_ref}"
+        
+        with st.spinner("Generating..."):
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": "Expert NERDC consultant. Never group weeks. Use printable symbols."}, {"role": "user", "content": p}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- 7. RESULTS & FOOTER ---
+# --- FOOTER & DOWNLOAD ---
 if 'out' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['out'])
-    file = create_docx(st.session_state['out'], st.session_state.get('t', 'Output'))
-    c_d, c_c = st.columns(2)
-    c_d.download_button("📥 Download Word Doc", file, f"{st.session_state.get('t', 'File')}.docx")
-    if c_c.button("🗑️ Reset"):
-        del st.session_state['out']
-        st.rerun()
+    file = create_docx(st.session_state['out'], "Vikidyl_Output")
+    st.download_button("📥 Download Word Doc", file, "Vikidyl_Material.docx")
 
 st.markdown(f"""
     <div style="height: 100px;"></div>
