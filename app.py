@@ -14,7 +14,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. MATH SYMBOL CLEANER (FOR PRINT) ---
+# --- 2. MATH SYMBOL CLEANER ---
 def format_math_for_print(text):
     subs = {
         r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)',
@@ -46,7 +46,7 @@ CURRICULUM_DATA = {
     }
 }
 
-# --- 4. CONNECTION ---
+# --- 4. CONNECTION & UTILS ---
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception:
@@ -68,51 +68,84 @@ st.caption("NERDC 2026 Standards • Full 3-Term Serialized Planning")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
+# --- TAB 1: QUICK TOOLS (RESTORED) ---
+with tabs[0]:
+    st.subheader("Fast Lesson Script")
+    lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
+    cls_q = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_q]["Classes"], key="cls_q")
+    sub_q = st.selectbox("Subject", CURRICULUM_DATA[lvl_q]["Subjects"], key="sub_q")
+    top_q = st.text_input("Topic", placeholder="e.g. Addition of Fractions", key="top_q")
+    
+    if st.button("Generate Quick Script"):
+        if top_q:
+            prompt_q = f"Write a quick lesson script for {cls_q} {sub_q}: {top_q}. Focus on 'Teacher Says' and 'Write on Board'."
+            with st.spinner("Drafting script..."):
+                chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_q}])
+                st.session_state['out'] = chat.choices[0].message.content
+                st.session_state['t'] = f"QuickScript_{cls_q}_{sub_q}"
+
+# --- TAB 2: ASSESSMENT BUILDER (RESTORED) ---
+with tabs[1]:
+    st.subheader("Automated Exam & Test Generator")
+    lvl_a = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
+    cls_a = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
+    sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
+    top_a = st.text_area("Topics to Cover", placeholder="List topics from your scheme...")
+    
+    if st.button("Generate Assessment"):
+        if top_a:
+            prompt_a = f"Create a standard assessment for {cls_a} {sub_a} based on these topics: {top_a}. Include MCQs and Theory with an Answer Key. Use printable math symbols."
+            with st.spinner("Generating questions..."):
+                chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_a}])
+                st.session_state['out'] = chat.choices[0].message.content
+                st.session_state['t'] = f"Exam_{cls_a}_{sub_a}"
+
+# --- TAB 3: NERDC SCHEME & NOTES (PRESERVED INTEGRITY) ---
 with tabs[2]:
     st.subheader("Official Serialized Planner & Note Generator")
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        lvl = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
-        cls = st.selectbox("Exact Class", CURRICULUM_DATA[lvl]["Classes"], key="cls_f")
-        sub = st.selectbox("Subject", CURRICULUM_DATA[lvl]["Subjects"], key="sub_f")
-        trm = st.selectbox("Target Term", ["1st Term", "2nd Term", "3rd Term", "Full Year (All 3 Terms)"], key="trm_f")
+        lvl_f = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
+        cls_f = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_f]["Classes"], key="cls_f")
+        sub_f = st.selectbox("Subject", CURRICULUM_DATA[lvl_f]["Subjects"], key="sub_f")
+        trm_f = st.selectbox("Target Term", ["1st Term", "2nd Term", "3rd Term", "Full Year (All 3 Terms)"], key="trm_f")
     
     with col2:
-        mode = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
+        mode_f = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
         manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
     # Note-specific inputs
-    wk, top = "N/A", "N/A"
-    if mode == "Detailed Weekly Lesson Note":
+    wk_f, top_f = "N/A", "N/A"
+    if mode_f == "Detailed Weekly Lesson Note":
         st.write("---")
         n1, n2 = st.columns(2)
-        wk = n1.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
-        top = n2.text_input("Enter Topic Name")
+        wk_f = n1.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
+        top_f = n2.text_input("Enter Topic Name")
 
     if st.button("🚀 Generate NERDC Material"):
         ref = f"Reference: {manual_ref}" if manual_ref else "Use standard NERDC 2026 curriculum."
         
-        if mode == "Serialized Scheme (Week 1-12)":
-            prompt = f"""Generate a serialized scheme of work for {cls} {sub} for {trm}. 
+        if mode_f == "Serialized Scheme (Week 1-12)":
+            prompt_f = f"""Generate a serialized scheme of work for {cls_f} {sub_f} for {trm_f}. 
             CRITICAL: List Week 1, Week 2, Week 3... through Week 12 individually. 
             Do NOT combine weeks. For every single week, provide a Topic and Behavioral Objectives. {ref}"""
-            st.session_state['t'] = f"{cls}_{sub}_{trm}_Scheme"
+            st.session_state['t'] = f"{cls_f}_{sub_f}_{trm_f}_Scheme"
         else:
-            prompt = f"""Write a comprehensive Lesson Note for {cls}, {sub}. TERM: {trm} | WEEK: {wk} | TOPIC: {top}. {ref}
+            prompt_f = f"""Write a comprehensive Lesson Note for {cls_f}, {sub_f}. TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}. {ref}
             STRUCTURE (FOLLOW 18-POINT OUTLINE STRICTLY):
             1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge.
             14. PRESENTATION: Detailed Step-by-Step Teacher vs Pupil Activities.
             15. WORKED EXAMPLES: Detailed examples with solutions using clear text math symbols.
             16. CLASS ACTIVITIES. 17. EVALUATION. 18. CONCLUSION/ASSIGNMENT.
             Include a FULL STUDENT NOTE at the end."""
-            st.session_state['t'] = f"{cls}_{sub}_{wk}"
+            st.session_state['t'] = f"{cls_f}_{sub_f}_{wk_f}"
 
         with st.spinner("Generating accurate NERDC material..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "system", "content": "Expert Nigerian curriculum consultant. Never group weeks together. Use printable symbols (x/y, √, ^2)."},
-                          {"role": "user", "content": prompt}]
+                          {"role": "user", "content": prompt_f}]
             )
             st.session_state['out'] = chat.choices[0].message.content
 
