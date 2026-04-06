@@ -96,7 +96,7 @@ if st.sidebar.button("Logout"):
 st.title("🎓 VIKIDYL AI Professional")
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# TAB 1 & 2 (Quick Tools & Assessment) - Unchanged as requested
+# TAB 1 & 2 (Quick Tools & Assessment)
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
@@ -123,7 +123,7 @@ with tabs[1]:
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Create {diff_a} exam for {cls_a} {sub_a} on: {top_a}"}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 3: NERDC (FIXED FOR PRE-NURSERY & GROUPING) ---
+# --- TAB 3: NERDC (FIXED LESSON NOTE FORMAT) ---
 with tabs[2]:
     st.subheader("NERDC Serialized Planner")
     col1, col2 = st.columns(2)
@@ -137,25 +137,33 @@ with tabs[2]:
         manual_ref = st.text_area("Manual Reference (Optional Override)", height=70)
     
     if st.button("🚀 Generate NERDC Material"):
-        # Custom logic for Pre-Nursery
-        age_guardrail = ""
-        if cls_f == "Pre-Nursery":
-            age_guardrail = "CRITICAL: This is for toddlers (Ages 2-3). Topics must be about identification, coloring, and play. No 'reading' or 'writing' or 'word formation'."
+        age_guardrail = "CRITICAL: For toddlers (Pre-Nursery), use identification/play words. For others, use academic NERDC standards." if cls_f == "Pre-Nursery" else ""
 
         if mode_f == "Serialized Scheme (Week 1-12)":
             p = f"""Generate a Serialized Scheme of Work for {cls_f} {sub_f} for {trm_f}.
-            RULE 1: You MUST list every week individually (Week 1, Week 2, Week 3... up to 12 per term).
-            RULE 2: DO NOT GROUP WEEKS (e.g., No 'Weeks 1-2'). Each week needs its own unique topic.
-            RULE 3: {age_guardrail}
-            Format: Week Number, Topic, Performance Objectives. {manual_ref}"""
+            RULE 1: List Weeks 1-12 individually. No grouping (e.g. No '1-2').
+            RULE 2: Provide Topic and Objectives for each week. {age_guardrail} {manual_ref}"""
         else:
-            p = f"18-point Lesson Note for {cls_f} {sub_f} {trm_f}. Topic: {manual_ref if manual_ref else 'Appropriate NERDC Topic'}. {age_guardrail}"
-        
-        with st.spinner("Ensuring NERDC Compliance..."):
+            p = f"""Create a Professional 18-Point Lesson Note for {cls_f} {sub_f} ({trm_f}).
+            Topic: {manual_ref if manual_ref else 'Appropriate NERDC Topic'}.
+            {age_guardrail}
+            STRICT FORMAT:
+            1-3. Admin details.
+            4. Behavioral Objectives.
+            5. Instructional Materials.
+            6. Entry Behavior (Prior Knowledge).
+            7-12. Step-by-step Presentation.
+            13. WORKED EXAMPLES: Provide detailed, solved examples or demonstrations.
+            14-15. Classwork and Homework.
+            16. Evaluation.
+            17. Conclusion.
+            18. FULL STUDENT NOTE: A comprehensive summary for students to copy into notebooks."""
+
+        with st.spinner("Generating Detailed Note..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
                 messages=[
-                    {"role": "system", "content": "You are a Nigerian NERDC Specialist. You NEVER group weeks. You provide 12 individual weeks per term. You ensure topics are developmentally appropriate for the specific age/class selected."},
+                    {"role": "system", "content": "You are a Nigerian NERDC Specialist. You must follow the 18-point lesson note format strictly, including worked examples and a full student copy note."},
                     {"role": "user", "content": p}
                 ]
             )
