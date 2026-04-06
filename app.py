@@ -13,12 +13,25 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. PRE-LISTED SUBJECT DATA (FIXED & IMPLEMENTED) ---
-DATA = {
-    "Pre-Nursery/Nursery": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes", "Creative Arts", "Science Experience"],
-    "Primary (Basic 1-6)": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "Nigerian History", "P.H.E", "Agriculture", "Home Economics", "Cultural Arts"],
-    "Junior College (JSS 1-3)": ["Mathematics", "English", "Basic Science", "Basic Technology", "Business Studies", "Social Studies", "Civic Education", "Agricultural Science", "Home Economics"],
-    "Senior College (SSS 1-3)": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics", "Government", "Literature", "Geography", "Commerce", "Financial Accounting"]
+# --- 2. DATA SEGMENTATION (BY EXACT CLASS) ---
+# This dictionary now maps the Group -> Specific Class -> Subject List
+CURRICULUM_DATA = {
+    "Nursery": {
+        "Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"],
+        "Subjects": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes", "Creative Arts"]
+    },
+    "Primary": {
+        "Classes": ["Basic 1", "Basic 2", "Basic 3", "Basic 4", "Basic 5", "Basic 6"],
+        "Subjects": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "Nigerian History", "P.H.E", "Agriculture", "Home Economics"]
+    },
+    "Junior Secondary": {
+        "Classes": ["JSS 1", "JSS 2", "JSS 3"],
+        "Subjects": ["Mathematics", "English", "Basic Science", "Basic Technology", "Business Studies", "Civic Education", "Agricultural Science"]
+    },
+    "Senior Secondary": {
+        "Classes": ["SSS 1", "SSS 2", "SSS 3"],
+        "Subjects": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics", "Government", "Literature", "Geography", "Commerce", "Financial Accounting"]
+    }
 }
 
 # --- 3. CONNECTION ---
@@ -40,54 +53,56 @@ def create_docx(text, title):
 
 # --- 4. THE INTERFACE ---
 st.title("🎓 VIKIDYL AI Professional")
-st.caption("NERDC 2026 Serialized Curriculum • Enhanced Professional Suite")
+st.caption("2026 NERDC Standard • Class-Specific Serialization")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Detailed Notes"])
 
 # --- TAB 1: QUICK TOOLS ---
 with tabs[0]:
     st.subheader("Fast Lesson Script")
-    lvl_q = st.selectbox("Select Level", list(DATA.keys()), key="lvl_q")
-    sub_q = st.selectbox("Select Subject", DATA[lvl_q], key="sub_q")
+    lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
+    cls_q = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_q]["Classes"], key="cls_q")
+    sub_q = st.selectbox("Subject", CURRICULUM_DATA[lvl_q]["Subjects"], key="sub_q")
     top_q = st.text_input("Topic", key="top_q")
     if st.button("Generate Quick Script"):
         with st.spinner("Processing..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": f"Quick 5-step script for {lvl_q} {sub_q}: {top_q}."}]
+                messages=[{"role": "user", "content": f"Quick 5-step script for {cls_q} {sub_q}: {top_q}."}]
             )
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 2: ASSESSMENT BUILDER (MODERATION IMPLEMENTED) ---
+# --- TAB 2: ASSESSMENT BUILDER ---
 with tabs[1]:
     st.subheader("Test & Exam Moderator")
     col1, col2 = st.columns(2)
-    lvl_a = col1.selectbox("Level", list(DATA.keys()), key="lvl_a")
-    sub_a = col2.selectbox("Subject", DATA[lvl_a], key="sub_a")
+    lvl_a = col1.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
+    cls_a = col2.selectbox("Exact Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
+    sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
     
-    # MODERATION SLIDER
     mod_a = st.select_slider("Select Exam Tone/Moderation", 
                             options=["Fun & Practical", "Standard Classroom", "Serious Academic", "Strict External Exam Style"])
     
     top_a = st.text_area("List Topics for Assessment")
     if st.button("Generate Moderated Exam"):
-        prompt = f"Create a {mod_a} style exam for {lvl_a} {sub_a}. Topics: {top_a}. Include MCQs and Theory with answers."
+        prompt = f"Create a {mod_a} style exam for {cls_a} {sub_a}. Topics: {top_a}. Include MCQs and Theory with solutions."
         with st.spinner(f"Setting {mod_a} questions..."):
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 3: SCHEME & NOTES (SERIALIZED WEEKS IMPLEMENTED) ---
+# --- TAB 3: SCHEME & NOTES (SERIALIZED BY CLASS) ---
 with tabs[2]:
-    st.subheader("Serialized Planner (Term 1 - 3)")
+    st.subheader("Class-Specific Serialized Planner")
     c1, c2 = st.columns([1, 1])
     
     with c1:
-        lvl_f = st.selectbox("Level", list(DATA.keys()), key="lvl_f")
-        sub_f = st.selectbox("Subject", DATA[lvl_f], key="sub_f")
-        mode_f = st.radio("Action", ["Serialized 3-Term Scheme (Full Year)", "Detailed Weekly Lesson Note"])
+        lvl_f = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
+        cls_f = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_f]["Classes"], key="cls_f")
+        sub_f = st.selectbox("Subject", CURRICULUM_DATA[lvl_f]["Subjects"], key="sub_f")
+        mode_f = st.radio("Action", ["Serialized 3-Term Scheme for this Class", "Detailed Weekly Lesson Note"])
     
     with c2:
-        st.info("📎 Optional: Upload specific curriculum to override standard NERDC.")
+        st.info("📎 Override standard NERDC by uploading your own scheme.")
         st.file_uploader("Upload Image/PDF", type=["jpg", "png", "pdf"])
         manual_f = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
@@ -95,26 +110,25 @@ with tabs[2]:
         st.write("---")
         n1, n2 = st.columns(2)
         trm_f = n1.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"])
-        # PRE-LISTED SERIALIZED WEEKS
-        wk_list = [f"Week {i}" for i in range(1, 13)]
-        wk_f = n2.selectbox("Select Week", wk_list)
+        wk_f = n2.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
         top_f = st.text_input("Enter Topic Name")
 
-    if st.button("🚀 Generate NERDC Material"):
-        if mode_f == "Serialized 3-Term Scheme (Full Year)":
-            prompt = f"Generate a full year serialized scheme of work for {lvl_f} {sub_f}. List Week 1-12 for 1st Term, Week 1-12 for 2nd Term, and Week 1-12 for 3rd Term separately."
+    if st.button("🚀 Generate Material"):
+        if mode_f == "Serialized 3-Term Scheme for this Class":
+            prompt = f"Generate a full year serialized scheme of work EXCLUSIVELY for {cls_f} {sub_f}. Do not mix with other classes. List Week 1-12 for 1st Term, Week 1-12 for 2nd Term, and Week 1-12 for 3rd Term separately with Topics and Behavioral Objectives."
         else:
-            prompt = f"""Write a comprehensive NERDC Lesson Note for {lvl_f}, {sub_f}.
+            prompt = f"""Write a comprehensive Lesson Note for {cls_f}, {sub_f}.
             TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}.
             
-            STRUCTURE:
-            1-13. Official NERDC Outlines (Subject to Previous Knowledge)
-            14. PRESENTATION: Detailed Teacher vs Pupil Activities.
-            15. WORKED EXAMPLES: At least 3 detailed examples with full solutions.
-            16. CLASSWORK & HOMEWORK: Specific questions for students.
-            17-18. EVALUATION, CONCLUSION & STUDENT NOTE.
+            STRUCTURE (FOLLOW STRICTLY):
+            1-13. Subject, Date, Class, Duration, Age, Gender, Theme, Learning Outcome, Focal Competence, Topic, Performance Objectives, Teaching Resources, Previous Knowledge.
+            14. PRESENTATION: Detailed Step-by-Step Teacher vs Pupil Activities.
+            15. WORKED EXAMPLES: Detailed examples with full step-by-step solutions.
+            16. CLASSWORK & HOMEWORK: Specific practice questions.
+            17. EVALUATION & CONCLUSION.
+            18. FULL STUDENT NOTE: Detailed for notebook copying.
             """
-        with st.spinner("AI is generating..."):
+        with st.spinner(f"Generating for {cls_f}..."):
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
             st.session_state['out'] = chat.choices[0].message.content
 
