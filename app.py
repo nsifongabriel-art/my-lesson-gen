@@ -59,9 +59,8 @@ if not st.session_state['authenticated']:
             st.error(f"Access Denied: {status}")
     st.stop()
 
-# --- 3. THE "SENSORY" MATH CLEANER ---
+# --- 3. MATH CLEANER ENGINE ---
 def clean_math(text):
-    """Surgically replaces LaTeX code with printable teacher symbols"""
     text = re.sub(r'\\frac\{(.+?)\}\{(.+?)\}', r'(\1 / \2)', text)
     text = re.sub(r'\\sqrt\{(.+?)\}', r'√(\1)', text)
     replacements = {
@@ -104,7 +103,7 @@ if st.sidebar.button("Logout"):
 st.title("🎓 VIKIDYL AI Professional")
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# TAB 1 & 2
+# TABS 1 & 2 (Quick Tools & Assessment) - Restored with Math Cleaning
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
@@ -113,7 +112,7 @@ with tabs[0]:
     top_q = st.text_input("Topic", key="top_q")
     if st.button("Generate Script"):
         with st.spinner("Drafting..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Quick script: {cls_q} {sub_q} - {top_q}"}])
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Script: {cls_q} {sub_q} - {top_q}"}])
             st.session_state['out'] = clean_math(chat.choices[0].message.content)
 
 with tabs[1]:
@@ -128,10 +127,10 @@ with tabs[1]:
         top_a = st.text_area("Topics", key="top_a")
     if st.button("Generate Assessment"):
         with st.spinner("Creating questions..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Exam for {cls_a} {sub_a} on: {top_a}"}])
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Exam: {cls_a} {sub_a} - {top_a}"}])
             st.session_state['out'] = clean_math(chat.choices[0].message.content)
 
-# --- TAB 3: NERDC (RESTORED LOGIC WITH MATH FIX) ---
+# --- TAB 3: NERDC (WITH VITAL ADMIN HEADERS) ---
 with tabs[2]:
     st.subheader("NERDC Serialized Planner")
     col1, col2 = st.columns(2)
@@ -150,19 +149,32 @@ with tabs[2]:
         top_f = n2.text_input("Topic Name")
 
     if st.button("🚀 Generate NERDC Material"):
-        age_guardrail = "Toddler play/identification only." if cls_f == "Pre-Nursery" else "Academic NERDC."
-
+        age_map = {"Pre-Nursery": "2-3 Years", "Nursery 1": "3-4 Years", "Nursery 2": "4-5 Years", "Basic 1": "5-6 Years"}
+        current_age = age_map.get(cls_f, "Appropriate for Level")
+        
         if mode_f == "Serialized Scheme (Week 1-12)":
-            p = f"Individual Week 1-12 Scheme for {cls_f} {sub_f} {trm_f}. No grouping. {manual_ref}"
+            p = f"Individual Week 1-12 NERDC Scheme for {cls_f} {sub_f} {trm_f}. No grouped weeks. {manual_ref}"
         else:
-            p = f"""Professional 18-Point Lesson Note for {cls_f} {sub_f} ({trm_f}) {wk_f}.
-            Topic: {top_f if top_f else 'NERDC Subject Matter'}. {age_guardrail} {manual_ref}
-            Follow 18-point structure strictly: 1-6 Admin/Behavioral Objectives, 7-12 Stepwise Presentation, 13 WORKED EXAMPLES, 14-15 Classwork/Homework, 16 Evaluation, 17 Conclusion, 18 FULL STUDENT NOTE."""
+            # THIS IS THE VITAL ADMIN HEADER QUERY
+            p = f"""Create a Professional 18-Point Lesson Note.
+            START with this ADMIN HEADER exactly:
+            - SUBJECT: {sub_f}
+            - CLASS: {cls_f}
+            - TERM: {trm_f}
+            - WEEK: {wk_f}
+            - DATE: [Teacher to Insert]
+            - DURATION: 40 Minutes
+            - AGE: {current_age}
+            - TOPIC: {top_f if top_f else 'NERDC Approved Topic'}
+            
+            Then continue with the 18 points:
+            1-6 Admin/Objectives, 7-12 Stepwise Presentation, 13 WORKED EXAMPLES (Detailed), 14-15 Classwork/Homework, 16 Evaluation, 17 Conclusion, 18 FULL STUDENT NOTE.
+            Use plain symbols (x, /, √, ^2). NO LaTeX."""
 
-        with st.spinner("Processing..."):
+        with st.spinner("Ensuring NERDC Compliance..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
-                messages=[{"role": "system", "content": "You are a Nigerian NERDC expert. Use plain math symbols ONLY (x, /, √, ^2). Never use LaTeX or backslashes. Ensure individual weeks and 18-point format."},
+                messages=[{"role": "system", "content": "You are a Nigerian NERDC expert. You strictly include professional headers and 18-point lesson formats without using LaTeX."},
                           {"role": "user", "content": p}]
             )
             st.session_state['out'] = clean_math(chat.choices[0].message.content)
