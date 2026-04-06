@@ -14,7 +14,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. MATH SYMBOL CLEANER ---
+# --- 2. MATH SYMBOL CLEANER (FOR PRINT) ---
 def format_math_for_print(text):
     subs = {
         r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)',
@@ -26,7 +26,7 @@ def format_math_for_print(text):
         text = re.sub(pattern, replacement, text)
     return text
 
-# --- 3. CLASS & SUBJECT DATABASE ---
+# --- 3. CURRICULUM DATABASE ---
 CURRICULUM_DATA = {
     "Nursery": {
         "Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"],
@@ -64,54 +64,54 @@ def create_docx(text, title):
 
 # --- 5. INTERFACE ---
 st.title("🎓 VIKIDYL AI Professional")
-st.caption("NERDC 2026 Standards • Serialized 12-Week Planning")
+st.caption("NERDC 2026 Standards • Full 3-Term Serialized Planning")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
 with tabs[2]:
     st.subheader("Official Serialized Planner & Note Generator")
-    col_input, col_ref = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1])
     
-    with col_input:
+    with col1:
         lvl = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
         cls = st.selectbox("Exact Class", CURRICULUM_DATA[lvl]["Classes"], key="cls_f")
         sub = st.selectbox("Subject", CURRICULUM_DATA[lvl]["Subjects"], key="sub_f")
-        mode = st.radio("Action", ["Full Serialized Termly Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
+        trm = st.selectbox("Target Term", ["1st Term", "2nd Term", "3rd Term", "Full Year (All 3 Terms)"], key="trm_f")
     
-    with col_ref:
-        st.info("📎 Optional: Reference your school's specific curriculum.")
-        st.file_uploader("Upload Image/PDF", type=["jpg", "png", "pdf"])
+    with col2:
+        mode = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
         manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
-    # Initialize variables to prevent NameError
-    trm, wk, top = "N/A", "N/A", "N/A"
-
+    # Note-specific inputs
+    wk, top = "N/A", "N/A"
     if mode == "Detailed Weekly Lesson Note":
         st.write("---")
-        n1, n2, n3 = st.columns(3)
-        trm = n1.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"])
-        wk = n2.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
-        top = n3.text_input("Enter Topic Name")
+        n1, n2 = st.columns(2)
+        wk = n1.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
+        top = n2.text_input("Enter Topic Name")
 
     if st.button("🚀 Generate NERDC Material"):
         ref = f"Reference: {manual_ref}" if manual_ref else "Use standard NERDC 2026 curriculum."
         
-        if mode == "Full Serialized Termly Scheme (Week 1-12)":
-            prompt = f"Generate a full serialized 12-week scheme for {cls} {sub}. List Week 1 through Week 12 individually. Do NOT combine weeks. Provide Topic and Objectives for each. {ref}"
-            st.session_state['t'] = f"{cls}_{sub}_Scheme"
+        if mode == "Serialized Scheme (Week 1-12)":
+            prompt = f"""Generate a serialized scheme of work for {cls} {sub} for {trm}. 
+            CRITICAL: List Week 1, Week 2, Week 3... through Week 12 individually. 
+            Do NOT combine weeks. For every single week, provide a Topic and Behavioral Objectives. {ref}"""
+            st.session_state['t'] = f"{cls}_{sub}_{trm}_Scheme"
         else:
             prompt = f"""Write a comprehensive Lesson Note for {cls}, {sub}. TERM: {trm} | WEEK: {wk} | TOPIC: {top}. {ref}
-            STRUCTURE (18 POINTS):
+            STRUCTURE (FOLLOW 18-POINT OUTLINE STRICTLY):
             1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge.
             14. PRESENTATION: Detailed Step-by-Step Teacher vs Pupil Activities.
-            15. WORKED EXAMPLES: At least 3 detailed examples with solutions (use clear math symbols).
-            16. CLASS ACTIVITIES. 17. EVALUATION. 18. CONCLUSION/ASSIGNMENT. Include FULL STUDENT NOTE."""
+            15. WORKED EXAMPLES: Detailed examples with solutions using clear text math symbols.
+            16. CLASS ACTIVITIES. 17. EVALUATION. 18. CONCLUSION/ASSIGNMENT.
+            Include a FULL STUDENT NOTE at the end."""
             st.session_state['t'] = f"{cls}_{sub}_{wk}"
 
-        with st.spinner("VIKIDYL AI is drafting..."):
+        with st.spinner("Generating accurate NERDC material..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": "Expert Nigerian curriculum consultant. Use clear printable symbols."},
+                messages=[{"role": "system", "content": "Expert Nigerian curriculum consultant. Never group weeks together. Use printable symbols (x/y, √, ^2)."},
                           {"role": "user", "content": prompt}]
             )
             st.session_state['out'] = chat.choices[0].message.content
