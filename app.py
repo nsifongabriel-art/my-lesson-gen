@@ -124,7 +124,7 @@ with tabs[1]:
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Create {diff_a} exam for {cls_a} {sub_a} on: {top_a}"}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# TAB 3: NERDC (FIXED FULL YEAR LOGIC)
+# TAB 3: NERDC (CHRONOLOGICAL LINKING)
 with tabs[2]:
     st.subheader("NERDC Serialized Planner")
     col1, col2 = st.columns(2)
@@ -146,18 +146,22 @@ with tabs[2]:
     if st.button("🚀 Generate NERDC Material"):
         if mode_f == "Serialized Scheme (Week 1-12)":
             if "Full Year" in trm_f:
-                p = f"""Generate a COMPLETE Serialized Scheme of Work for {cls_f} {sub_f} for the ENTIRE YEAR.
-                You MUST provide three distinct sections: 1ST TERM, 2ND TERM, and 3RD TERM.
-                For EACH term, you MUST list Week 1 through Week 12 individually. 
-                Do NOT combine weeks. Provide Topic and Objectives for every single week from Week 1 to 36 total.
-                {manual_ref}"""
+                p = f"COMPLETE Serialized Scheme for {cls_f} {sub_f} ENTIRE YEAR. 3 terms, 12 weeks each (Total 36). Follow NERDC chronological progression. {manual_ref}"
             else:
-                p = f"Generate a serialized 12-week scheme for {cls_f} {sub_f} for {trm_f}. List Week 1 through 12 individually. Objectives for each. {manual_ref}"
+                p = f"Serialized 12-week scheme for {cls_f} {sub_f} for {trm_f}. Ensure topics follow {trm_f} NERDC standards. {manual_ref}"
         else:
-            p = f"Detailed 18-point lesson note for {cls_f} {sub_f} {trm_f} {wk_f} {top_f}. Follow strict format. {manual_ref}"
+            # THIS IS THE KEY FIX: Linking the note to the term context
+            p = f"""Write an 18-point Lesson Note for {cls_f} {sub_f}. 
+            TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}.
+            CONTEXT: Since this is {trm_f}, ensure the content level and prior knowledge assumptions align with the NERDC Full Year progression. 
+            Do NOT repeat 1st term foundations if this is 2nd or 3rd term. {manual_ref}"""
         
-        with st.spinner("Compiling full year curriculum..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": "Expert NERDC consultant. For Full Year, you MUST provide 3 terms, each with 12 weeks serialized. Never group weeks."}, {"role": "user", "content": p}])
+        with st.spinner("Processing..."):
+            chat = client.chat.completions.create(
+                model="llama-3.3-70b-versatile", 
+                messages=[{"role": "system", "content": "Expert Nigerian NERDC consultant. You ensure that individual weekly notes align perfectly with the year-long curriculum map."},
+                          {"role": "user", "content": p}]
+            )
             st.session_state['out'] = chat.choices[0].message.content
 
 # OUTPUT
