@@ -14,37 +14,36 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. THE MATH FIXER (FOR WORD DOCUMENTS) ---
-def clean_math_for_word(text):
-    """Converts LaTeX symbols to human-readable text for Word printing."""
-    replacements = {
-        r'\\frac\{(.+?)\}\{(.+?)\}': r'\1/\2',
-        r'\\sqrt\{(.+?)\}': r'√( \1 )',
-        r'\\text\{(.+?)\}': r'\1',
-        r'\^2': '²', r'\^3': '³',
-        r'\$': '', r'\\': ''
+# --- 2. MATH & SYMBOL CLEANER (FOR PRINT INTEGRITY) ---
+def format_math_for_print(text):
+    """Converts LaTeX code into clear, printable text symbols."""
+    subs = {
+        r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)',
+        r'\\sqrt\{(.+?)\}': r'√(\1)',
+        r'\\pm': '±', r'\\times': '×', r'\\div': '÷',
+        r'\^2': '²', r'\^3': '³', r'\$': '', r'\\': ''
     }
-    for pattern, replacement in replacements.items():
+    for pattern, replacement in subs.items():
         text = re.sub(pattern, replacement, text)
     return text
 
-# --- 3. DATA SEGMENTATION ---
+# --- 3. CLASS & SUBJECT DATABASE (SERIALIZED) ---
 CURRICULUM_DATA = {
     "Nursery": {
         "Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"],
-        "Subjects": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes"]
+        "Subjects": ["Letter Work", "Number Work", "Health Habits", "Social Norms", "Rhymes", "Science Experience"]
     },
     "Primary": {
         "Classes": ["Basic 1", "Basic 2", "Basic 3", "Basic 4", "Basic 5", "Basic 6"],
-        "Subjects": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "P.H.E", "Agriculture"]
+        "Subjects": ["Mathematics", "English Studies", "Basic Science & Tech", "Social Studies", "Nigerian History", "P.H.E", "Agriculture", "Home Economics"]
     },
     "Junior Secondary": {
         "Classes": ["JSS 1", "JSS 2", "JSS 3"],
-        "Subjects": ["Mathematics", "English", "Basic Science", "Basic Technology", "Business Studies"]
+        "Subjects": ["Mathematics", "English", "Basic Science", "Basic Technology", "Business Studies", "Civic Education", "Social Studies"]
     },
     "Senior Secondary": {
         "Classes": ["SSS 1", "SSS 2", "SSS 3"],
-        "Subjects": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics"]
+        "Subjects": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Further Maths", "Economics", "Government", "Food and Nutrition", "Financial Accounting"]
     }
 }
 
@@ -58,9 +57,7 @@ except Exception:
 def create_docx(text, title):
     doc = Document()
     doc.add_heading(f'VIKIDYL AI - {title}', 0)
-    # Applying the Math Fixer here
-    final_text = clean_math_for_word(text)
-    doc.add_paragraph(final_text)
+    doc.add_paragraph(format_math_for_print(text))
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -68,64 +65,78 @@ def create_docx(text, title):
 
 # --- 5. INTERFACE ---
 st.title("🎓 VIKIDYL AI Professional")
-st.caption("NERDC 2026 • Serialized Curriculum • Print-Ready Mathematics")
+st.caption("NERDC 2026 Standards • Serialized 12-Week Planning")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Detailed Notes"])
 
-# --- TAB 3: SCHEME & NOTES (The Core Tool) ---
+# --- TAB 3: SCHEME & NOTES ---
 with tabs[2]:
-    st.subheader("Official Serialized Planner")
-    c1, c2 = st.columns([1, 1])
+    st.subheader("Official Serialized Planner & Note Generator")
+    col_input, col_ref = st.columns([1, 1])
     
-    with c1:
-        lvl_f = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
-        cls_f = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_f]["Classes"], key="cls_f")
-        sub_f = st.selectbox("Subject", CURRICULUM_DATA[lvl_f]["Subjects"], key="sub_f")
-        mode_f = st.radio("Action", ["Serialized 3-Term Scheme", "Comprehensive Weekly Lesson Note"])
+    with col_input:
+        lvl = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
+        cls = st.selectbox("Exact Class", CURRICULUM_DATA[lvl]["Classes"], key="cls_f")
+        sub = st.selectbox("Subject", CURRICULUM_DATA[lvl]["Subjects"], key="sub_f")
+        mode = st.radio("Action", ["Full Serialized Termly Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
     
-    with c2:
-        st.info("📎 Optional Reference Upload")
+    with col_ref:
+        st.info("📎 Optional: Reference your school's specific curriculum.")
         st.file_uploader("Upload Image/PDF", type=["jpg", "png", "pdf"])
-        manual_f = st.text_area("Paste Specific Topics (Optional Override)", height=70)
+        manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
-    if mode_f == "Comprehensive Weekly Lesson Note":
+    if mode == "Detailed Weekly Lesson Note":
         st.write("---")
-        n1, n2 = st.columns(2)
-        trm_f = n1.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"])
-        wk_f = n2.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
-        top_f = st.text_input("Enter Weekly Topic")
+        n1, n2, n3 = st.columns(3)
+        trm = n1.selectbox("Term", ["1st Term", "2nd Term", "3rd Term"])
+        wk = n2.selectbox("Select Week", [f"Week {i}" for i in range(1, 13)])
+        top = n3.text_input("Enter Topic Name")
 
     if st.button("🚀 Generate NERDC Material"):
-        if mode_f == "Serialized 3-Term Scheme":
-            prompt = f"Generate a year scheme for {cls_f} {sub_f}. List Term 1 (Wk 1-12), Term 2 (Wk 1-12), Term 3 (Wk 1-12). Use clean symbols."
+        ref = f"Reference: {manual_ref}" if manual_ref else "Use standard NERDC 2026 curriculum."
+        
+        if mode == "Full Serialized Termly Scheme (Week 1-12)":
+            prompt = f"""Generate a full serialized 12-week scheme of work for {cls} {sub}. 
+            CRITICAL: List Week 1, Week 2, Week 3... all the way to Week 12 individually. 
+            Do NOT combine weeks. For each week, provide the Topic and Behavioral Objectives. {ref}"""
         else:
-            prompt = f"""Write a comprehensive Lesson Note for {cls_f}, {sub_f}. 
-            TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}.
+            prompt = f"""Write a comprehensive Lesson Note for {cls}, {sub}.
+            TERM: {trm} | WEEK: {wk} | TOPIC: {top}. {ref}
             
-            IMPORTANT: For all Math/Science symbols, use $...$ notation for screen rendering, but ensure they are easy to read. 
-            Include 18-point outline: Subject, Theme, Learning Outcome, Focal Competence, etc. 
-            Include 3 Worked Examples with full solutions and 5 Classwork/Homework questions.
-            """
-        with st.spinner("Processing..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt}])
-            st.session_state['out'] = chat.choices[0].message.content
-            st.session_state['t'] = f"{cls_f}_{sub_f}_Note"
+            STRUCTURE (FOLLOW 18-POINT OUTLINE STRICTLY):
+            1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching and Learning Resources, 13. Previous Knowledge.
+            14. PRESENTATION: Detailed Step-by-Step Teacher vs Pupil Activities.
+            15. WORKED EXAMPLES: Detailed examples with solutions using clear text math symbols.
+            16. CLASS ACTIVITIES (IF ANY).
+            17. EVALUATION.
+            18. CONCLUSION / ASSIGNMENT.
+            Include a FULL STUDENT NOTE at the end. Use clear symbols like x/y, √x, x²."""
 
-# --- 6. RESULTS & EXPORT ---
+        with st.spinner("Processing..."):
+            chat = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "system", "content": "Expert NERDC consultant. Never combine weeks. Use printable symbols."},
+                          {"role": "user", "content": prompt}]
+            )
+            st.session_state['out'] = chat.choices[0].message.content
+            st.session_state['t'] = f"{cls}_{sub}_{wk}"
+
+# --- 6. RESULTS & FOOTER ---
 if 'out' in st.session_state:
     st.markdown("---")
-    # THE SCREEN RENDERER: This handles the math symbols for the teacher's eyes
     st.markdown(st.session_state['out'])
-    
-    file = create_docx(st.session_state['out'], st.session_state.get('t', 'Output'))
-    col_d, col_c = st.columns(2)
-    col_d.download_button("📥 Download Print-Ready Word Doc", file, f"{st.session_state.get('t', 'Doc')}.docx")
-    if col_c.button("🗑️ Reset Page"):
+    file = create_docx(st.session_state['out'], st.session_state['t'])
+    c_d, c_c = st.columns(2)
+    c_d.download_button("📥 Download Word Doc", file, f"{st.session_state['t']}.docx")
+    if c_c.button("🗑️ Reset"):
         del st.session_state['out']
         st.rerun()
 
-# --- FOOTER ---
 st.markdown(f"""
     <div style="height: 100px;"></div>
-    <div class="footer"><p>© 2026 VIKIDYL AI - Nigerian Education Standard</p></div>
+    <div class="footer">
+        <p>Developed by <b>Ufford I.I. - Vikidyl Models Consult</b><br>
+        Email: <a href="mailto:digitalisedmindset@gmail.com">digitalisedmindset@gmail.com</a><br>
+        © 2026 VIKIDYL AI - Nigerian Education Standards</p>
+    </div>
     """, unsafe_allow_html=True)
