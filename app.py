@@ -3,6 +3,7 @@ from groq import Groq
 from docx import Document
 from io import BytesIO
 import re
+from datetime import datetime
 
 # --- 1. BRANDING & STYLE ---
 st.set_page_config(page_title="VIKIDYL AI Pro", page_icon="🎓", layout="wide")
@@ -14,7 +15,45 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. MATH SYMBOL CLEANER ---
+# --- 2. SECURITY LAYER (ADMIN CONTROL) ---
+# EDIT THIS LIST TO ADD/REMOVE CODES
+# Format: "CODE": "YYYY-MM-DD"
+VALID_CODES = {
+    "VIK-2026-PRO": "2026-12-31",  
+    "VIK-TRIAL-01": "2026-04-15",  
+    "UFFORD-ADMIN": "2027-01-01"   
+}
+
+def check_access(code):
+    if code in VALID_CODES:
+        expiry_date = datetime.strptime(VALID_CODES[code], "%Y-%m-%d")
+        if datetime.now() <= expiry_date:
+            return True, expiry_date.strftime("%d %B %Y")
+        else:
+            return False, "Expired"
+    return False, "Invalid"
+
+# Session State for Authentication
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+
+if not st.session_state['authenticated']:
+    st.title("🔐 VIKIDYL AI - Secure Access")
+    st.info("Developed by Ufford I.I. - Vikidyl Models Consult")
+    
+    user_code = st.text_input("Enter Teacher Access Code", type="password")
+    if st.button("Unlock System"):
+        is_valid, status = check_access(user_code)
+        if is_valid:
+            st.session_state['authenticated'] = True
+            st.session_state['expiry'] = status
+            st.success(f"Access Granted! Valid until: {status}")
+            st.rerun()
+        else:
+            st.error(f"Access Denied: Code is {status}")
+    st.stop() # Stops unauthorized users from seeing the content below
+
+# --- 3. MATH SYMBOL CLEANER ---
 def format_math_for_print(text):
     subs = {
         r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)',
@@ -26,7 +65,7 @@ def format_math_for_print(text):
         text = re.sub(pattern, replacement, text)
     return text
 
-# --- 3. CURRICULUM DATABASE ---
+# --- 4. CURRICULUM DATABASE ---
 CURRICULUM_DATA = {
     "Nursery": {
         "Classes": ["Pre-Nursery", "Nursery 1", "Nursery 2"],
@@ -46,11 +85,11 @@ CURRICULUM_DATA = {
     }
 }
 
-# --- 4. CONNECTION & UTILS ---
+# --- 5. CONNECTION ---
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception:
-    st.error("🔑 API Key Missing! Please add GROQ_API_KEY to Streamlit Secrets.")
+    st.error("🔑 API Key Missing! Check Streamlit Secrets.")
     st.stop()
 
 def create_docx(text, title):
@@ -62,19 +101,25 @@ def create_docx(text, title):
     buffer.seek(0)
     return buffer
 
-# --- 5. INTERFACE ---
+# --- 6. MAIN INTERFACE (Only visible after login) ---
+st.sidebar.success(f"Access Active")
+st.sidebar.write(f"Expires: {st.session_state['expiry']}")
+if st.sidebar.button("Logout"):
+    st.session_state['authenticated'] = False
+    st.rerun()
+
 st.title("🎓 VIKIDYL AI Professional")
 st.caption("NERDC 2026 Standards • Full 3-Term Serialized Planning")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# --- TAB 1: QUICK TOOLS (UNTOUCHED) ---
+# --- TAB 1: QUICK TOOLS ---
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
     cls_q = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_q]["Classes"], key="cls_q")
     sub_q = st.selectbox("Subject", CURRICULUM_DATA[lvl_q]["Subjects"], key="sub_q")
-    top_q = st.text_input("Topic", placeholder="e.g. Addition of Fractions", key="top_q")
+    top_q = st.text_input("Topic", placeholder="e.g. Simple Interest", key="top_q")
     
     if st.button("Generate Quick Script"):
         if top_q:
@@ -84,50 +129,36 @@ with tabs[0]:
                 st.session_state['out'] = chat.choices[0].message.content
                 st.session_state['t'] = f"QuickScript_{cls_q}_{sub_q}"
 
-# --- TAB 2: ASSESSMENT BUILDER (MODERATION ADDED) ---
+# --- TAB 2: ASSESSMENT BUILDER ---
 with tabs[1]:
     st.subheader("Automated Exam & Test Generator")
     c1, c2 = st.columns(2)
-    
     with c1:
         lvl_a = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
         cls_a = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
         sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
-    
     with c2:
-        # NEW: Difficulty Moderation Dropdown
-        diff_a = st.selectbox("Assessment Tone/Difficulty", ["Standard", "Moderate", "Fun"], key="diff_a")
-        top_a = st.text_area("Topics to Cover", placeholder="List topics from your scheme...")
+        diff_a = st.selectbox("Tone/Difficulty", ["Standard", "Moderate", "Fun"], key="diff_a")
+        top_a = st.text_area("Topics to Cover", key="top_a")
     
     if st.button("Generate Assessment"):
         if top_a:
-            # Logic to change prompt based on difficulty
-            tone_instruction = {
-                "Fun": "Use engaging, gamified, and highly relatable language for the questions.",
-                "Moderate": "Use a mix of simple recall and slightly challenging application questions.",
-                "Standard": "Follow strict academic exam protocols with high-rigor questions."
-            }
-            
-            prompt_a = f"""Create a {diff_a} level assessment for {cls_a} {sub_a} based on these topics: {top_a}. 
-            Tone Instruction: {tone_instruction[diff_a]}
-            Include MCQs and Theory with an Answer Key. Use printable math symbols (no code)."""
-            
-            with st.spinner(f"Generating {diff_a} Assessment..."):
+            tone_map = {"Fun": "engaging and gamified", "Moderate": "balanced recall and application", "Standard": "high rigor academic style"}
+            prompt_a = f"Create a {diff_a} level assessment for {cls_a} {sub_a} on topics: {top_a}. Use {tone_map[diff_a]}. Include MCQs, Theory, and Answer Key."
+            with st.spinner("Generating questions..."):
                 chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_a}])
                 st.session_state['out'] = chat.choices[0].message.content
-                st.session_state['t'] = f"Exam_{diff_a}_{cls_a}_{sub_a}"
+                st.session_state['t'] = f"Exam_{cls_a}_{sub_a}"
 
-# --- TAB 3: NERDC SCHEME & NOTES (UNTOUCHED) ---
+# --- TAB 3: NERDC SCHEME & NOTES ---
 with tabs[2]:
     st.subheader("Official Serialized Planner & Note Generator")
     col1, col2 = st.columns([1, 1])
-    
     with col1:
         lvl_f = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_f")
         cls_f = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_f]["Classes"], key="cls_f")
         sub_f = st.selectbox("Subject", CURRICULUM_DATA[lvl_f]["Subjects"], key="sub_f")
-        trm_f = st.selectbox("Target Term", ["1st Term", "2nd Term", "3rd Term", "Full Year (All 3 Terms)"], key="trm_f")
-    
+        trm_f = st.selectbox("Target Term", ["1st Term", "2nd Term", "3rd Term", "Full Year"], key="trm_f")
     with col2:
         mode_f = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
         manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
@@ -141,31 +172,20 @@ with tabs[2]:
 
     if st.button("🚀 Generate NERDC Material"):
         ref = f"Reference: {manual_ref}" if manual_ref else "Use standard NERDC 2026 curriculum."
-        
         if mode_f == "Serialized Scheme (Week 1-12)":
-            prompt_f = f"""Generate a serialized scheme of work for {cls_f} {sub_f} for {trm_f}. 
-            CRITICAL: List Week 1, Week 2, Week 3... through Week 12 individually. 
-            Do NOT combine weeks. For every single week, provide a Topic and Behavioral Objectives. {ref}"""
+            prompt_f = f"Generate a serialized 12-week scheme for {cls_f} {sub_f} for {trm_f}. List Week 1 through 12 individually. Topic and Objectives for each. {ref}"
             st.session_state['t'] = f"{cls_f}_{sub_f}_{trm_f}_Scheme"
         else:
             prompt_f = f"""Write a comprehensive Lesson Note for {cls_f}, {sub_f}. TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}. {ref}
-            STRUCTURE (FOLLOW 18-POINT OUTLINE STRICTLY):
-            1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge.
-            14. PRESENTATION: Detailed Step-by-Step Teacher vs Pupil Activities.
-            15. WORKED EXAMPLES: Detailed examples with solutions using clear text math symbols.
-            16. CLASS ACTIVITIES. 17. EVALUATION. 18. CONCLUSION/ASSIGNMENT.
+            STRUCTURE: 1. Subject, 2. Date, 3. Class, 4. Duration, 5. Age, 6. Gender, 7. Theme, 8. Learning Outcome, 9. Focal Competence, 10. Topic, 11. Performance Objectives, 12. Teaching Resources, 13. Previous Knowledge, 14. PRESENTATION (Step-by-Step), 15. WORKED EXAMPLES, 16. CLASS ACTIVITIES, 17. EVALUATION, 18. CONCLUSION/ASSIGNMENT.
             Include a FULL STUDENT NOTE at the end."""
             st.session_state['t'] = f"{cls_f}_{sub_f}_{wk_f}"
 
-        with st.spinner("Generating accurate NERDC material..."):
-            chat = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": "Expert Nigerian curriculum consultant. Never group weeks together. Use printable symbols (x/y, √, ^2)."},
-                          {"role": "user", "content": prompt_f}]
-            )
+        with st.spinner("Drafting..."):
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_f}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- 6. RESULTS & FOOTER ---
+# --- 7. RESULTS & FOOTER ---
 if 'out' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['out'])
