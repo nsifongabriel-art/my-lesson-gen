@@ -59,15 +59,29 @@ if not st.session_state['authenticated']:
             st.error(f"Access Denied: {status}")
     st.stop()
 
-# --- 3. UTILITIES ---
+# --- 3. MATH FORMATTING ENGINE (FIXED) ---
 def format_math_for_print(text):
-    subs = {r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)', r'\\sqrt\{(.+?)\}': r'√(\1)', r'\\pm': '±', r'\\times': '×', r'\\div': '÷', r'\^2': '²', r'\^3': '³', r'\$': '', r'\\': ''}
+    # This cleans up the AI's "code-like" math into printable symbols
+    subs = {
+        r'\\frac\{(.+?)\}\{(.+?)\}': r'(\1 / \2)', 
+        r'\\sqrt\{(.+?)\}': r'√(\1)', 
+        r'\\pm': '±', 
+        r'\\times': '×', 
+        r'\\div': '÷', 
+        r'\^2': '²', 
+        r'\^3': '³', 
+        r'\$': '', 
+        r'\\': '',
+        r'\\theta': 'θ',
+        r'\\pi': 'π'
+    }
     for pattern, replacement in subs.items():
         text = re.sub(pattern, replacement, text)
     return text
 
 def create_docx(text, title):
     doc = Document(); doc.add_heading(f'VIKIDYL AI - {title}', 0)
+    # Applying the math fix to the word document output
     doc.add_paragraph(format_math_for_print(text))
     buffer = BytesIO(); doc.save(buffer); buffer.seek(0)
     return buffer
@@ -96,7 +110,7 @@ if st.sidebar.button("Logout"):
 st.title("🎓 VIKIDYL AI Professional")
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# TAB 1 & 2 (Quick Tools & Assessment)
+# TAB 1 & 2
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
@@ -123,7 +137,7 @@ with tabs[1]:
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Create {diff_a} exam for {cls_a} {sub_a} on: {top_a}"}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# --- TAB 3: NERDC (FIXED LESSON NOTE FORMAT) ---
+# --- TAB 3: NERDC (WITH MATH SYMBOL FIX) ---
 with tabs[2]:
     st.subheader("NERDC Serialized Planner")
     col1, col2 = st.columns(2)
@@ -153,23 +167,24 @@ with tabs[2]:
             5. Instructional Materials.
             6. Entry Behavior (Prior Knowledge).
             7-12. Step-by-step Presentation.
-            13. WORKED EXAMPLES: Provide detailed, solved examples or demonstrations.
+            13. WORKED EXAMPLES: Provide detailed, solved examples or demonstrations. Use plain text symbols (e.g. ^2 for squared, / for division).
             14-15. Classwork and Homework.
             16. Evaluation.
             17. Conclusion.
             18. FULL STUDENT NOTE: A comprehensive summary for students to copy into notebooks."""
 
-        with st.spinner("Generating Detailed Note..."):
+        with st.spinner("Formatting Symbols..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
                 messages=[
-                    {"role": "system", "content": "You are a Nigerian NERDC Specialist. You must follow the 18-point lesson note format strictly, including worked examples and a full student copy note."},
+                    {"role": "system", "content": "You are a Nigerian NERDC Specialist. You must follow the 18-point format. Do not use LaTeX. Use plain text for math (e.g. Use 2^2 instead of mathematical code)."},
                     {"role": "user", "content": p}
                 ]
             )
-            st.session_state['out'] = chat.choices[0].message.content
+            # Applying fix to the screen display
+            st.session_state['out'] = format_math_for_print(chat.choices[0].message.content)
 
-# FOOTER
+# OUTPUT AND DOWNLOAD
 if 'out' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['out'])
