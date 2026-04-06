@@ -96,7 +96,7 @@ if st.sidebar.button("Logout"):
 st.title("🎓 VIKIDYL AI Professional")
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# TAB 1: QUICK TOOLS
+# TAB 1 & 2 (Quick Tools & Assessment) - Unchanged as requested
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
@@ -108,7 +108,6 @@ with tabs[0]:
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Quick lesson script for {cls_q} {sub_q}: {top_q}"}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# TAB 2: ASSESSMENT
 with tabs[1]:
     st.subheader("Assessment Builder")
     c1, c2 = st.columns(2)
@@ -124,7 +123,7 @@ with tabs[1]:
             chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Create {diff_a} exam for {cls_a} {sub_a} on: {top_a}"}])
             st.session_state['out'] = chat.choices[0].message.content
 
-# TAB 3: NERDC (CHRONOLOGICAL LINKING)
+# --- TAB 3: NERDC (FIXED FOR PRE-NURSERY & GROUPING) ---
 with tabs[2]:
     st.subheader("NERDC Serialized Planner")
     col1, col2 = st.columns(2)
@@ -137,38 +136,36 @@ with tabs[2]:
         mode_f = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
         manual_ref = st.text_area("Manual Reference (Optional Override)", height=70)
     
-    wk_f, top_f = "N/A", "N/A"
-    if mode_f == "Detailed Weekly Lesson Note":
-        n1, n2 = st.columns(2)
-        wk_f = n1.selectbox("Week", [f"Week {i}" for i in range(1, 13)])
-        top_f = n2.text_input("Topic Name")
-
     if st.button("🚀 Generate NERDC Material"):
+        # Custom logic for Pre-Nursery
+        age_guardrail = ""
+        if cls_f == "Pre-Nursery":
+            age_guardrail = "CRITICAL: This is for toddlers (Ages 2-3). Topics must be about identification, coloring, and play. No 'reading' or 'writing' or 'word formation'."
+
         if mode_f == "Serialized Scheme (Week 1-12)":
-            if "Full Year" in trm_f:
-                p = f"COMPLETE Serialized Scheme for {cls_f} {sub_f} ENTIRE YEAR. 3 terms, 12 weeks each (Total 36). Follow NERDC chronological progression. {manual_ref}"
-            else:
-                p = f"Serialized 12-week scheme for {cls_f} {sub_f} for {trm_f}. Ensure topics follow {trm_f} NERDC standards. {manual_ref}"
+            p = f"""Generate a Serialized Scheme of Work for {cls_f} {sub_f} for {trm_f}.
+            RULE 1: You MUST list every week individually (Week 1, Week 2, Week 3... up to 12 per term).
+            RULE 2: DO NOT GROUP WEEKS (e.g., No 'Weeks 1-2'). Each week needs its own unique topic.
+            RULE 3: {age_guardrail}
+            Format: Week Number, Topic, Performance Objectives. {manual_ref}"""
         else:
-            # THIS IS THE KEY FIX: Linking the note to the term context
-            p = f"""Write an 18-point Lesson Note for {cls_f} {sub_f}. 
-            TERM: {trm_f} | WEEK: {wk_f} | TOPIC: {top_f}.
-            CONTEXT: Since this is {trm_f}, ensure the content level and prior knowledge assumptions align with the NERDC Full Year progression. 
-            Do NOT repeat 1st term foundations if this is 2nd or 3rd term. {manual_ref}"""
+            p = f"18-point Lesson Note for {cls_f} {sub_f} {trm_f}. Topic: {manual_ref if manual_ref else 'Appropriate NERDC Topic'}. {age_guardrail}"
         
-        with st.spinner("Processing..."):
+        with st.spinner("Ensuring NERDC Compliance..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
-                messages=[{"role": "system", "content": "Expert Nigerian NERDC consultant. You ensure that individual weekly notes align perfectly with the year-long curriculum map."},
-                          {"role": "user", "content": p}]
+                messages=[
+                    {"role": "system", "content": "You are a Nigerian NERDC Specialist. You NEVER group weeks. You provide 12 individual weeks per term. You ensure topics are developmentally appropriate for the specific age/class selected."},
+                    {"role": "user", "content": p}
+                ]
             )
             st.session_state['out'] = chat.choices[0].message.content
 
-# OUTPUT
+# FOOTER
 if 'out' in st.session_state:
     st.markdown("---")
     st.markdown(st.session_state['out'])
-    file = create_docx(st.session_state['out'], "Vikidyl_Output")
-    st.download_button("📥 Download Word Doc", file, "Vikidyl_Material.docx")
+    file = create_docx(st.session_state['out'], "Vikidyl_NERDC")
+    st.download_button("📥 Download Word Doc", file, "Vikidyl_NERDC.docx")
 
 st.markdown(f'<div class="footer"><p>Developed by <b>Ufford I.I. - Vikidyl Models Consult</b><br>Email: digitalisedmindset@gmail.com<br>© 2026 VIKIDYL AI</p></div>', unsafe_allow_html=True)
