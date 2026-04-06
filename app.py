@@ -68,7 +68,7 @@ st.caption("NERDC 2026 Standards • Full 3-Term Serialized Planning")
 
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# --- TAB 1: QUICK TOOLS (RESTORED) ---
+# --- TAB 1: QUICK TOOLS (UNTOUCHED) ---
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
@@ -84,23 +84,40 @@ with tabs[0]:
                 st.session_state['out'] = chat.choices[0].message.content
                 st.session_state['t'] = f"QuickScript_{cls_q}_{sub_q}"
 
-# --- TAB 2: ASSESSMENT BUILDER (RESTORED) ---
+# --- TAB 2: ASSESSMENT BUILDER (MODERATION ADDED) ---
 with tabs[1]:
     st.subheader("Automated Exam & Test Generator")
-    lvl_a = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
-    cls_a = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
-    sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
-    top_a = st.text_area("Topics to Cover", placeholder="List topics from your scheme...")
+    c1, c2 = st.columns(2)
+    
+    with c1:
+        lvl_a = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_a")
+        cls_a = st.selectbox("Exact Class", CURRICULUM_DATA[lvl_a]["Classes"], key="cls_a")
+        sub_a = st.selectbox("Subject", CURRICULUM_DATA[lvl_a]["Subjects"], key="sub_a")
+    
+    with c2:
+        # NEW: Difficulty Moderation Dropdown
+        diff_a = st.selectbox("Assessment Tone/Difficulty", ["Standard", "Moderate", "Fun"], key="diff_a")
+        top_a = st.text_area("Topics to Cover", placeholder="List topics from your scheme...")
     
     if st.button("Generate Assessment"):
         if top_a:
-            prompt_a = f"Create a standard assessment for {cls_a} {sub_a} based on these topics: {top_a}. Include MCQs and Theory with an Answer Key. Use printable math symbols."
-            with st.spinner("Generating questions..."):
+            # Logic to change prompt based on difficulty
+            tone_instruction = {
+                "Fun": "Use engaging, gamified, and highly relatable language for the questions.",
+                "Moderate": "Use a mix of simple recall and slightly challenging application questions.",
+                "Standard": "Follow strict academic exam protocols with high-rigor questions."
+            }
+            
+            prompt_a = f"""Create a {diff_a} level assessment for {cls_a} {sub_a} based on these topics: {top_a}. 
+            Tone Instruction: {tone_instruction[diff_a]}
+            Include MCQs and Theory with an Answer Key. Use printable math symbols (no code)."""
+            
+            with st.spinner(f"Generating {diff_a} Assessment..."):
                 chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": prompt_a}])
                 st.session_state['out'] = chat.choices[0].message.content
-                st.session_state['t'] = f"Exam_{cls_a}_{sub_a}"
+                st.session_state['t'] = f"Exam_{diff_a}_{cls_a}_{sub_a}"
 
-# --- TAB 3: NERDC SCHEME & NOTES (PRESERVED INTEGRITY) ---
+# --- TAB 3: NERDC SCHEME & NOTES (UNTOUCHED) ---
 with tabs[2]:
     st.subheader("Official Serialized Planner & Note Generator")
     col1, col2 = st.columns([1, 1])
@@ -115,7 +132,6 @@ with tabs[2]:
         mode_f = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
         manual_ref = st.text_area("Paste Specific Topics (Optional Override)", height=70)
 
-    # Note-specific inputs
     wk_f, top_f = "N/A", "N/A"
     if mode_f == "Detailed Weekly Lesson Note":
         st.write("---")
