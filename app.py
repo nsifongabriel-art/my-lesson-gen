@@ -59,47 +59,25 @@ if not st.session_state['authenticated']:
             st.error(f"Access Denied: {status}")
     st.stop()
 
-# --- 3. THE "READY-TO-PRINT" MATH ENGINE ---
-def clean_math_output(text):
-    """Forcefully removes LaTeX and converts to readable teacher symbols"""
-    # 1. Handle Fractions: \frac{a}{b} -> (a / b)
+# --- 3. THE "SENSORY" MATH CLEANER ---
+def clean_math(text):
+    """Surgically replaces LaTeX code with printable teacher symbols"""
     text = re.sub(r'\\frac\{(.+?)\}\{(.+?)\}', r'(\1 / \2)', text)
-    # 2. Handle Roots: \sqrt{x} -> √(x)
     text = re.sub(r'\\sqrt\{(.+?)\}', r'√(\1)', text)
-    # 3. Handle Common LaTeX Symbols
     replacements = {
-        r'\\times': '×',
-        r'\\div': '÷',
-        r'\\pm': '±',
-        r'\\geq': '≥',
-        r'\\leq': '≤',
-        r'\\neq': '≠',
-        r'\\approx': '≈',
-        r'\\alpha': 'α',
-        r'\\beta': 'β',
-        r'\\theta': 'θ',
-        r'\\pi': 'π',
-        r'\\sum': 'Σ',
-        r'\\infty': '∞',
-        r'\^2': '²',
-        r'\^3': '³',
-        r'\$': '', # Remove dollar signs
-        r'\\': ''  # Catch-all for remaining backslashes
+        r'\\times': '×', r'\\div': '÷', r'\\pm': '±', r'\\geq': '≥', r'\\leq': '≤',
+        r'\\neq': '≠', r'\\approx': '≈', r'\\alpha': 'α', r'\\beta': 'β',
+        r'\\theta': 'θ', r'\\pi': 'π', r'\^2': '²', r'\^3': '³', r'\$': '', r'\\': ''
     }
     for pattern, replacement in replacements.items():
         text = re.sub(pattern, replacement, text)
     return text
 
 def create_docx(text, title):
-    doc = Document()
-    doc.add_heading(f'VIKIDYL AI Professional - {title}', 0)
-    # Clean math before putting it into the Word Doc
-    clean_text = clean_math_output(text)
-    for line in clean_text.split('\n'):
+    doc = Document(); doc.add_heading(f'VIKIDYL AI - {title}', 0)
+    for line in text.split('\n'):
         doc.add_paragraph(line)
-    buffer = BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
+    buffer = BytesIO(); doc.save(buffer); buffer.seek(0)
     return buffer
 
 # --- 4. CURRICULUM DATA ---
@@ -114,10 +92,11 @@ CURRICULUM_DATA = {
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except:
-    st.error("🔑 API Key Error: Check your Streamlit Secrets.")
+    st.error("🔑 API Key Error")
     st.stop()
 
-st.sidebar.success(f"Access Active until {st.session_state['expiry']}")
+st.sidebar.success("Access Active")
+st.sidebar.write(f"Expires: {st.session_state['expiry']}")
 if st.sidebar.button("Logout"):
     st.session_state['authenticated'] = False
     st.rerun()
@@ -125,7 +104,7 @@ if st.sidebar.button("Logout"):
 st.title("🎓 VIKIDYL AI Professional")
 tabs = st.tabs(["📝 Quick Tools", "📊 Assessment Builder", "📅 NERDC Scheme & Notes"])
 
-# TAB 1 & 2 (Cleaned Math included here too)
+# TAB 1 & 2
 with tabs[0]:
     st.subheader("Fast Lesson Script")
     lvl_q = st.selectbox("Level Group", list(CURRICULUM_DATA.keys()), key="lvl_q")
@@ -134,8 +113,8 @@ with tabs[0]:
     top_q = st.text_input("Topic", key="top_q")
     if st.button("Generate Script"):
         with st.spinner("Drafting..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Lesson script for {cls_q} {sub_q}: {top_q}. Use plain symbols only."}])
-            st.session_state['out'] = clean_math_output(chat.choices[0].message.content)
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Quick script: {cls_q} {sub_q} - {top_q}"}])
+            st.session_state['out'] = clean_math(chat.choices[0].message.content)
 
 with tabs[1]:
     st.subheader("Assessment Builder")
@@ -149,10 +128,10 @@ with tabs[1]:
         top_a = st.text_area("Topics", key="top_a")
     if st.button("Generate Assessment"):
         with st.spinner("Creating questions..."):
-            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Create {diff_a} exam for {cls_a} {sub_a} on: {top_a}. Use plain text math symbols."}])
-            st.session_state['out'] = clean_math_output(chat.choices[0].message.content)
+            chat = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": f"Exam for {cls_a} {sub_a} on: {top_a}"}])
+            st.session_state['out'] = clean_math(chat.choices[0].message.content)
 
-# --- TAB 3: NERDC (FULL 18-POINT + NO-CODE MATH) ---
+# --- TAB 3: NERDC (RESTORED LOGIC WITH MATH FIX) ---
 with tabs[2]:
     st.subheader("NERDC Serialized Planner")
     col1, col2 = st.columns(2)
@@ -165,29 +144,34 @@ with tabs[2]:
         mode_f = st.radio("Action", ["Serialized Scheme (Week 1-12)", "Detailed Weekly Lesson Note"])
         manual_ref = st.text_area("Manual Reference (Optional Override)", height=70)
     
+    if mode_f == "Detailed Weekly Lesson Note":
+        n1, n2 = st.columns(2)
+        wk_f = n1.selectbox("Week", [f"Week {i}" for i in range(1, 13)])
+        top_f = n2.text_input("Topic Name")
+
     if st.button("🚀 Generate NERDC Material"):
-        age_guardrail = "Toddler-friendly play words only." if cls_f == "Pre-Nursery" else "Academic NERDC standards."
+        age_guardrail = "Toddler play/identification only." if cls_f == "Pre-Nursery" else "Academic NERDC."
 
         if mode_f == "Serialized Scheme (Week 1-12)":
-            p = f"Scheme for {cls_f} {sub_f} {trm_f}. 12 individual weeks. No grouping. {age_guardrail} {manual_ref}"
+            p = f"Individual Week 1-12 Scheme for {cls_f} {sub_f} {trm_f}. No grouping. {manual_ref}"
         else:
-            p = f"""Professional 18-Point Lesson Note for {cls_f} {sub_f} ({trm_f}).
-            Topic: {manual_ref if manual_ref else 'Appropriate NERDC Topic'}.
-            {age_guardrail}
-            STRICTLY USE PLAIN SYMBOLS (x, /, ^2, √). NEVER USE BACKSLASHES OR LATEX CODE.
-            FOLLOW 18-POINT STRUCTURE: 1-6 Admin/Objectives, 7-12 Steps, 13 Worked Examples, 14-15 Exercises, 16-17 Eval/Conclusion, 18 Full Student Note."""
+            p = f"""Professional 18-Point Lesson Note for {cls_f} {sub_f} ({trm_f}) {wk_f}.
+            Topic: {top_f if top_f else 'NERDC Subject Matter'}. {age_guardrail} {manual_ref}
+            Follow 18-point structure strictly: 1-6 Admin/Behavioral Objectives, 7-12 Stepwise Presentation, 13 WORKED EXAMPLES, 14-15 Classwork/Homework, 16 Evaluation, 17 Conclusion, 18 FULL STUDENT NOTE."""
 
-        with st.spinner("Generating Final Document..."):
+        with st.spinner("Processing..."):
             chat = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
-                messages=[
-                    {"role": "system", "content": "You are a Nigerian NERDC Specialist. You are FORBIDDEN from using LaTeX math code. You must use only symbols available on a standard keyboard or Unicode (like ×, ÷, ², √)."},
-                    {"role": "user", "content": p}
-                ]
+                messages=[{"role": "system", "content": "You are a Nigerian NERDC expert. Use plain math symbols ONLY (x, /, √, ^2). Never use LaTeX or backslashes. Ensure individual weeks and 18-point format."},
+                          {"role": "user", "content": p}]
             )
-            # Final scrub for both screen and download
-            st.session_state['out'] = clean_math_output(chat.choices[0].message.content)
+            st.session_state['out'] = clean_math(chat.choices[0].message.content)
 
-# --- OUTPUT DISPLAY & DOWNLOAD ---
+# OUTPUT
 if 'out' in st.session_state:
     st.markdown("---")
+    st.markdown(st.session_state['out'])
+    file = create_docx(st.session_state['out'], "Vikidyl_Output")
+    st.download_button("📥 Download Word Doc", file, "Vikidyl_Material.docx")
+
+st.markdown(f'<div class="footer"><p>Developed by <b>Ufford I.I. - Vikidyl Models Consult</b><br>Email: digitalisedmindset@gmail.com<br>© 2026 VIKIDYL AI</p></div>', unsafe_allow_html=True)
